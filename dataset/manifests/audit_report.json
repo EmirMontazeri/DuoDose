@@ -1,0 +1,167 @@
+{
+  "generated_at_utc": "2026-09-11T15:22:34.486838+00:00",
+  "overall_status": "PASS_WITH_WARNINGS",
+  "pass_count": 16,
+  "warning_count": 3,
+  "fail_count": 0,
+  "expected_dataset_properties": {
+    "dream_cells": 85,
+    "dream_corrected_matrices": 11608,
+    "oi_corrected_matrices": 20489,
+    "dream_drugs": 118
+  },
+  "known_accepted_source_limitations": {
+    "biologics_without_small_molecule_smiles": {
+      "ADAM17": "MEDI3622; monoclonal antibody",
+      "CD19": "MT-103 / Blinatumomab; bispecific antibody",
+      "PDGFR_Ab": "MEDI-575; monoclonal antibody",
+      "TNFSF10": "TRAIL; protein ligand"
+    },
+    "unresolved_challenge_agent_structures": [
+      "ATR_3",
+      "PIP5K1",
+      "SLC16A4"
+    ]
+  },
+  "checks": [
+    {
+      "name": "Required files",
+      "status": "PASS",
+      "message": "All critical V2 source paths are present.",
+      "details": {}
+    },
+    {
+      "name": "Corrected DREAM matrices",
+      "status": "PASS",
+      "message": "11,608 found.",
+      "details": {}
+    },
+    {
+      "name": "Corrected OI matrices",
+      "status": "PASS",
+      "message": "20,489 found.",
+      "details": {}
+    },
+    {
+      "name": "DREAM drug population",
+      "status": "PASS",
+      "message": "118 unique drugs found.",
+      "details": {}
+    },
+    {
+      "name": "Matrix filename format",
+      "status": "PASS",
+      "message": "All corrected filenames follow the expected pattern.",
+      "details": {}
+    },
+    {
+      "name": "DREAM cell metadata",
+      "status": "PASS",
+      "message": "85 cell lines found with required identifiers.",
+      "details": {}
+    },
+    {
+      "name": "Original DREAM expression",
+      "status": "PASS",
+      "message": "17,419 genes x 83 cells.",
+      "details": {}
+    },
+    {
+      "name": "DREAM molecular archive",
+      "status": "PASS",
+      "message": "Archive is readable with 22 entries.",
+      "details": {}
+    },
+    {
+      "name": "DREAM-CMP COSMIC uniqueness",
+      "status": "PASS",
+      "message": "DREAM COSMIC IDs map uniquely.",
+      "details": {}
+    },
+    {
+      "name": "DREAM-CMP cell mapping",
+      "status": "PASS",
+      "message": "85/85 DREAM cells mapped by COSMIC ID.",
+      "details": {}
+    },
+    {
+      "name": "RNA-seq schema",
+      "status": "PASS",
+      "message": "model_id, gene_symbol and rsem_tpm present.",
+      "details": {}
+    },
+    {
+      "name": "RNA-seq DREAM-cell coverage",
+      "status": "PASS",
+      "message": "85/85 mapped DREAM cells have usable RSEM TPM.",
+      "details": {}
+    },
+    {
+      "name": "Chemistry release population",
+      "status": "PASS",
+      "message": "119 unique challenge compounds/agents found.",
+      "details": {}
+    },
+    {
+      "name": "Used-drug chemistry coverage",
+      "status": "WARN",
+      "message": "111/118 used DREAM agents have directly usable SMILES/PubChem identifiers; 7 known source-level exception(s) remain.",
+      "details": {
+        "biologics_without_small_molecule_smiles": {
+          "ADAM17": "MEDI3622; monoclonal antibody",
+          "CD19": "MT-103 / Blinatumomab; bispecific antibody",
+          "PDGFR_Ab": "MEDI-575; monoclonal antibody",
+          "TNFSF10": "TRAIL; protein ligand"
+        },
+        "unresolved_challenge_agents": [
+          "ATR_3",
+          "PIP5K1",
+          "SLC16A4"
+        ]
+      }
+    },
+    {
+      "name": "Corrected matrix parsing",
+      "status": "PASS",
+      "message": "All 12 sampled matrices contain valid 2D dose-response grids.",
+      "details": {}
+    },
+    {
+      "name": "Corrected matrix metadata labels",
+      "status": "WARN",
+      "message": "1 sampled metadata-label discrepancy/discrepancies found.",
+      "details": {
+        "discrepancies": [
+          {
+            "file": "MAP2K_1&AKT_1&BT474&Exp1.xlsx",
+            "type": "cell-label mismatch",
+            "filename_cell": "BT474",
+            "matrix_title": "BT474C"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Raw combination files",
+      "status": "PASS",
+      "message": "2,199 raw combination CSV files found.",
+      "details": {}
+    },
+    {
+      "name": "Raw matrix parsing",
+      "status": "PASS",
+      "message": "All 12 sampled raw combination matrices contain valid 2D dose-response grids.",
+      "details": {}
+    },
+    {
+      "name": "Dose-response cell labels",
+      "status": "WARN",
+      "message": "1 response cell label(s) require explicit alias resolution.",
+      "details": {
+        "unmatched": {
+          "KMSII": 19
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# Explicit source-sensitivity experiment. All unspecified settings use the V2 defaults.
+# The DREAM-only baseline remains configs/v2.yaml.
+dataset_root: dataset
+sources:
+  sources: [oi]

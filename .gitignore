@@ -1,0 +1,83 @@
+# =====================================================================
+# Operating System
+# =====================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# =====================================================================
+# Python / Environment / Caches
+# =====================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments (uv / venv)
+.venv/
+venv/
+env/
+
+# Packaging / Distribution
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Linters
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# =====================================================================
+# ML Runs, Checkpoints & Outputs
+# =====================================================================
+# Experiment outputs, metrics, logs, and weights
+runs/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.log
+*.jsonl
+
+# =====================================================================
+# Datasets & Heavy Data Formats
+# =====================================================================
+# Raw inputs (never commit raw external datasets)
+dataset/raw/
+
+# Generated heavy data / arrays (uncomment lines below if fully generated via scripts)
+dataset/processed/
+dataset/splits/
+
+# Binary data file patterns
+*.parquet
+*.npz
+*.npy
+*.h5
+*.hdf5
+*.tar.gz
+*.zip
+
+# Exceptions: Allow tracking metadata/manifests and markdown files inside dataset/
+!dataset/**/*.json
+!dataset/**/*.jsonl
+!dataset/**/*.md
+!dataset/**/source_manifest.sha256
+
+# =====================================================================
+# IDEs & Editors
+# =====================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
