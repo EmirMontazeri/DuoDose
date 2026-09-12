@@ -70,12 +70,16 @@ class TrainingConfig:
 
 @dataclass
 class EvaluationConfig:
-    """Explicit supplementary metrics; NLL remains the primary held-out metric."""
+    """Fixed reporting policy; these settings never select training checkpoints."""
 
     batch_size: int = 1024
     target_inhibition: float = 0.5
     target_tolerance: float = 0.05
     inhibition_bin_edges: list[float] = field(default_factory=lambda: [0, 0.25, 0.5, 0.75, 1])
+    bootstrap_repetitions: int = 2000
+    bootstrap_seed: int = 20260912
+    confidence_level: float = 0.95
+    worst_group_fraction: float = 0.1
 
 
 @dataclass
@@ -170,6 +174,13 @@ class ExperimentConfig:
                 raise ValueError("scheduler_factor must be in (0,1)")
         if self.evaluation.batch_size < 1 or self.evaluation.target_tolerance < 0:
             raise ValueError("Invalid evaluation batch size/tolerance")
+        if (
+            self.evaluation.bootstrap_repetitions < 100
+            or self.evaluation.bootstrap_seed < 0
+            or not 0 < self.evaluation.confidence_level < 1
+            or not 0 < self.evaluation.worst_group_fraction <= 1
+        ):
+            raise ValueError("Invalid evaluation bootstrap/confidence/worst-group settings")
         edges = self.evaluation.inhibition_bin_edges
         if len(edges) < 2 or any(a >= b for a, b in zip(edges, edges[1:])):
             raise ValueError("inhibition_bin_edges must strictly increase")

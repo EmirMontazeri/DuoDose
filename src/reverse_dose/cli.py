@@ -7,7 +7,6 @@ directory. Commands refuse raw-data output paths and artifact overwrites.
 from __future__ import annotations
 
 import argparse
-import copy
 import logging
 import uuid
 from dataclasses import asdict
@@ -287,11 +286,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _common_config(experiments)
     experiments.add_argument("--output", type=Path, required=True)
-    experiments.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
+    experiments.add_argument("--split-seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
+    experiments.add_argument("--training-seeds", type=int, nargs="+", default=[42, 43])
+    experiments.add_argument(
+        "--reference-suite",
+        type=Path,
+        help="Reuse exact matching completed scientific configurations",
+    )
     experiments.add_argument(
         "--protocols", choices=["cell", "cell_pair"], nargs="+", default=["cell"]
     )
     experiments.add_argument("--resume", action="store_true")
+    assessment = sub.add_parser(
+        "assess-suite",
+        help="Reassess fixed completed checkpoints with biological-unit statistics and retrospective target achievement",
+    )
+    assessment.add_argument("--suite", type=Path, required=True)
+    assessment.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -301,6 +312,11 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     setup_logging()
     try:
+        if args.command == "assess-suite":
+            from .reporting import assess_suite
+
+            assess_suite(args.suite, args.output)
+            return
         if args.command == "predict":
             if args.bundle:
                 if args.data_dir or args.checkpoint:
@@ -414,37 +430,16 @@ def main(argv: list[str] | None = None) -> None:
                 evaluate_test=not args.skip_test,
             )
         elif args.command == "experiments":
-            if len(set(args.seeds)) != len(args.seeds) or len(set(args.protocols)) != len(
-                args.protocols
-            ):
-                raise ValueError("Experiment seeds and protocols must be unique")
-            records = []
-            for protocol in args.protocols:
-                for seed in args.seeds:
-                    effective = copy.deepcopy(config)
-                    effective.seed = effective.split.seed = seed
-                    effective.split.protocol = protocol
-                    effective.validate()
-                    member_dir = args.output / f"{protocol}_seed_{seed}"
-                    result = run(
-                        effective,
-                        member_dir,
-                        resume=args.resume and (member_dir / "run.json").exists(),
-                    )
-                    if result["status"] != "complete":
-                        LOGGER.warning("Experiment interrupted; resume the declared suite")
-                        return
-                    records.append({"protocol": protocol, "seed": seed, **result["test"]})
-            args.output.mkdir(parents=True, exist_ok=True)
-            pd.DataFrame(records).to_csv(args.output / "experiments.csv", index=False)
-            atomic_json(
-                args.output / "suite.json",
-                {
-                    "seeds": args.seeds,
-                    "protocols": args.protocols,
-                    "base_config": config.to_dict(),
-                    "results": records,
-                },
+            from .experiments import run_factorial
+
+            run_factorial(
+                config,
+                args.output,
+                args.split_seeds,
+                args.training_seeds,
+                args.protocols,
+                resume=args.resume,
+                reference_suite=args.reference_suite,
             )
         else:
             parser.error("Unsupported command")

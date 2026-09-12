@@ -299,8 +299,11 @@ interface consistent for reversed requests; it does not make the raw MDN head
 equivariant. Evaluation diagnostics call the raw model in both orders before
 canonicalization to expose that distinction.
 
-The primary metric is mean NLL in scaled log-dose coordinates. Supplemental
-outputs are original-unit NLL with the Jacobian; per-coordinate and pooled
+The checkpoint-selection metric remains validation mean NLL in scaled log-dose
+coordinates. It is not the sole primary reporting result: evaluation promotes
+macro-identity, inhibition-stratified, near-target, worst-group and retrospective
+target-achievement summaries alongside it. Outputs include original-unit NLL
+with the Jacobian; per-coordinate and pooled
 MAE/RMSE in scaled and µM units; negative point-prediction fraction; and raw-head
 swap diagnostics. The point summary is
 
@@ -327,6 +330,24 @@ subset records zero count and null metrics. It does not relabel observations as
 exactly 50% inhibition. Multi-seed and warm/cold experiments retain separate
 per-run results and declared protocol/seed settings; no benchmark numbers are
 implied by the proposal.
+
+The versioned [evaluation assessment protocol](evaluation_assessment.md) defines
+the additional estimands and artifacts. Recommendations at fixed inhibition 0.5
+are frozen before revealing responses, snapped to the full original assay grid
+using dose distance only, then scored without response-based reselection. A
+missing or quality-excluded selected response remains unscorable. This tests the
+discrete recommendation policy, not the biological response at an unmeasured
+continuous dose. Original workbook hashes and the prepared split are verified.
+
+Uncertainty resamples whole CMP identity components, retaining all their nested
+pairs, matrices and rows. It does not treat dose rows as independent biological
+samples. Intervals are conditional on the fixed checkpoint and split; cold-cell
+intervals based on only 12 identities carry an explicit small-cluster warning.
+The experimental design crosses independent split and training seeds and reports
+their descriptive variability separately within each protocol. Neither those
+repetitions nor warm-completion identities constitute additional cold-cell
+biological replication. No test metric changes checkpoint selection, training
+weights, the model architecture or the output distribution.
 
 ## Reproducibility, artifacts and continuation
 

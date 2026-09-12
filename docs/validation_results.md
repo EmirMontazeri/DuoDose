@@ -1,5 +1,11 @@
 # Recorded results and verification
 
+For the current quality-controlled six-run suite and its expanded evaluation,
+see [evaluation assessment](evaluation_assessment.md) and
+[the current retrospective report](evaluation_results.md). The tables below are
+historical, not current suite results. Directory names may have been reused;
+the dataset fingerprints below, not the names alone, identify these old runs.
+
 > Historical-result notice (pipeline schema 1): these runs used the earlier
 > 85-model expression extraction and 48/8 cold-split VAE cohorts. The current
 > pipeline uses all eligible CMP cell-line RNA-seq models with identity-grouped

@@ -14,11 +14,11 @@ and [decision register](docs/implementation_plan.md). Predicted coordinates are
 research outputs; coordinate accuracy alone does not establish achievement of a
 requested biological response.
 
-Historical recorded runs and verification evidence are described in
-[validation results](docs/validation_results.md). Those artifacts predate the
-expanded, identity-grouped VAE population and remain under `runs/` for audit;
-they are not checkpoints of the current preprocessing schema. Raw-data exclusions
-and severe out-of-range response/prediction cases remain visible in those results.
+The current evaluation methods and reproducible commands are described in
+[evaluation assessment](docs/evaluation_assessment.md). Historical numbers in
+[validation results](docs/validation_results.md) predate the expanded,
+identity-grouped VAE population; do not attribute those numbers to a current
+checkpoint merely because a run directory has the same name.
 The [complete source validation](docs/source_validation.md) records all DREAM
 and OI matrix counts, retained populations, label conflicts and missing grids.
 
@@ -108,10 +108,10 @@ kill resumes from the most recent completed checkpoint. Existing runs require
 `--resume`; a changed dataset, configuration, encoder, code or runtime is rejected
 as a different experiment. Start a new output directory for changed experiments.
 
-The included `runs/smoke`, `runs/v2` and `runs/suite` artifacts use the earlier
-85-model expression extraction and intentionally fail current continuation
-identity checks. Use fresh run directories for the expanded-VAE quality-controlled
-pipeline.
+Check each run's saved configuration, dataset fingerprint and source identity
+before reuse. Historical checkpoints cannot continue under a changed pipeline;
+use fresh output directories for changed experiments. The current `runs/suite`
+contains the six quality-controlled, expanded-VAE experiments reassessed below.
 
 ## Execute stages separately
 
@@ -197,16 +197,40 @@ fails clearly. No statistics are refitted for the new cell.
 
 ## Experiments and artifacts
 
-Run a declared multi-seed cold-start and warm-completion comparison with:
+Reassess completed, frozen checkpoints without retraining or overwriting their
+original evaluations:
 
 ```bash
-uv run reverse-dose experiments --config configs/v2.yaml --output runs/suite \
-  --seeds 42 43 44 --protocols cell cell_pair
+uv run --frozen reverse-dose assess-suite --suite runs/suite \
+  --output runs/suite-assessment-v1.1
 ```
 
-The suite writes `experiments.csv` and `suite.json`; each constituent run retains
-its full artifacts. Append `--resume` to continue an existing suite. OI inclusion
-is a separate, explicit experiment: copy the configuration and set
+Run a frozen Cartesian design with **independent** partition and training seeds:
+
+```bash
+uv run --frozen reverse-dose experiments --config configs/v2.yaml \
+  --output runs/factorial-reproduction --split-seeds 42 43 44 45 46 \
+  --training-seeds 42 43 --protocols cell cell_pair --reference-suite runs/suite
+```
+
+This declares 20 combinations (five partitions × two training seeds × two
+protocols). Exact scientific-configuration matches in the optional reference
+suite are reused and identified, not counted as newly trained replicates. The
+legacy `--seeds` option, which confounded both sources of randomness, is replaced
+by the two explicit axes. Append `--resume` with the identical command to
+continue; the frozen design cannot change in place.
+
+Both commands write separate `cell_results.csv`, `cell_pair_results.csv` and
+`summary.json`. Factorial runs additionally retain `design.json` and incremental
+`progress.json`. Every evaluation now writes an `assessment/` directory with
+primary macro-cell, inhibition-stratified, near-target and worst-group metrics;
+identity-cluster intervals; density/covariance diagnostics; and response-blind
+target choices scored against the original held-out matrices. Raw workbooks are
+required for the target assessment; a portable bundle alone is insufficient to
+reconstruct missing/QC-excluded grid coordinates safely.
+
+These are retrospective robustness analyses, not new independent biological
+replication. OI inclusion is a separate, explicit experiment: copy the configuration and set
 `sources.sources: [dream, oi]`. The original raw matrices are never pooled with
 their corrected versions. `cell_pair` groups all replicates of a cell/unordered
 drug pair and reports overlap with training cells; its interpretation differs

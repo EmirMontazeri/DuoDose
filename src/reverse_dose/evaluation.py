@@ -1,8 +1,8 @@
 """Held-out distribution evaluation, grouped diagnostics and reproducible tables.
 
-NLL in standardized log-dose coordinates is primary. Original-unit densities
-include the Jacobian. Coordinate errors summarize a distribution and are not
-proof that any suggested dose achieves a requested inhibition.
+Validation NLL selects checkpoints; primary reporting also covers biological
+groups, inhibition strata, target achievement and calibration. Original-unit
+densities include the Jacobian. Coordinate errors alone are not target evidence.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
+from .assessment import target_window_mask
 from .config import ExperimentConfig
 from .data import DataBundle
 from .models import mixture_log_prob
@@ -167,15 +168,13 @@ def evaluate(
         if number % 25 == 0:
             LOGGER.info("Evaluation batch %d/%d", number + 1, len(loader))
     results = pd.concat(frames, ignore_index=True)
+    arrays = {key: np.concatenate(value) for key, value in parameter_rows.items()}
     results.to_parquet(output_dir / "predictions.parquet", index=False)
     np.savez_compressed(
         output_dir / "mixture_parameters.npz",
-        **{key: np.concatenate(value) for key, value in parameter_rows.items()},
+        **arrays,
     )
-    near_target = results.loc[
-        (results.inhibition - config.evaluation.target_inhibition).abs()
-        <= config.evaluation.target_tolerance
-    ]
+    near_target = results.loc[target_window_mask(results.inhibition, config.evaluation)]
     groups = {}
     for label, columns in {
         "cell": ["cell_id"],
@@ -216,6 +215,26 @@ def evaluate(
             "Gaussian predictions may have negative dose coordinates; no clipping.",
         ],
     }
+    from .assessment import enhanced_assessment
+
+    raw_available = "source_file" in results and all(
+        (Path(config.dataset_root) / name).is_file() for name in results.source_file.unique()
+    )
+    assessment = enhanced_assessment(
+        bundle,
+        config,
+        model,
+        results.drop(columns="inhibition_bin"),
+        arrays,
+        output_dir / "assessment",
+        split,
+        include_target=raw_available,
+    )
+    report["primary"] = assessment["primary"]
+    report["target_achievement"] = assessment["target_achievement"]
+    report["generalization"] = assessment["generalization"]
+    report["biological_units"] = assessment["biological_units"]
+    report["assessment_artifacts"] = "assessment/assessment.json"
     atomic_json(output_dir / "metrics.json", report)
     LOGGER.info(
         "%s NLL=%.6f coordinate MAE=%.6f; artifacts: %s",

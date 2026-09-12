@@ -57,6 +57,7 @@ dataset/raw/
 # Generated heavy data / arrays (uncomment lines below if fully generated via scripts)
 dataset/processed/
 dataset/splits/
+dataset/manifests
 
 # Binary data file patterns
 *.parquet
@@ -67,11 +68,13 @@ dataset/splits/
 *.tar.gz
 *.zip
 
+# Predicted Runs
+predict
+
 # Exceptions: Allow tracking metadata/manifests and markdown files inside dataset/
 !dataset/**/*.json
 !dataset/**/*.jsonl
 !dataset/**/*.md
-!dataset/**/source_manifest.sha256
 
 # =====================================================================
 # IDEs & Editors

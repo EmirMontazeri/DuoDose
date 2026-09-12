@@ -96,23 +96,32 @@ def test_raw_output_guard_resolves_symlinks(tmp_path: Path) -> None:
     guard_output(root / "processed" / "safe", root)
 
 
-def test_suite_resume_continues_existing_and_starts_pending_runs(
+def test_suite_cli_passes_independent_seed_axes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from reverse_dose import cli
+    from reverse_dose import experiments
 
-    directory = tmp_path / "suite"
-    existing = directory / "cell_seed_42"
-    existing.mkdir(parents=True)
-    (existing / "run.json").write_text("{}")
     calls = []
 
-    def fake_run(config, run_dir, *, resume=False):
-        calls.append((run_dir.name, resume))
-        return {"status": "complete", "test": {"nll": 1.0, "count": 5}}
+    def fake_run(config, output, splits, trainings, protocols, **kwargs):
+        calls.append((splits, trainings, protocols, kwargs["resume"]))
+        return {"status": "complete"}
 
-    monkeypatch.setattr(cli, "run", fake_run)
-    main(["experiments", "--output", str(directory), "--seeds", "42", "43", "--resume"])
-    assert calls == [("cell_seed_42", True), ("cell_seed_43", False)]
-    assert (directory / "experiments.csv").exists()
+    monkeypatch.setattr(experiments, "run_factorial", fake_run)
+    main(
+        [
+            "experiments",
+            "--output",
+            str(tmp_path / "suite"),
+            "--split-seeds",
+            "42",
+            "43",
+            "--training-seeds",
+            "101",
+            "102",
+            "103",
+            "--resume",
+        ]
+    )
+    assert calls == [([42, 43], [101, 102, 103], ["cell"], True)]

@@ -89,6 +89,13 @@ or forward-response model will be invented.
   response results with an explicit tolerance, and final-output swap diagnostics.
   Point summaries do not guarantee target achievement. No forward efficacy or
   clinical validation claim is possible from this inverse model alone.
+- Extend evaluation without changing training: response-blind fixed-target
+  grid recommendations followed by held-out scoring; primary macro-identity,
+  fixed inhibition-stratum, near-target and worst-group reporting; intact
+  identity-cluster intervals; and PIT/coverage/covariance diagnostics. Cross
+  independent partition and full-pipeline training seeds, keep protocols
+  separate, and preserve all declared runs. See the versioned
+  [assessment protocol](evaluation_assessment.md) for estimands and limitations.
 
 ## Engineering sequence
 
