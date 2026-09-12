@@ -38,9 +38,7 @@ class Predictor:
     def __init__(self, data_dir: Path, checkpoint: Path, device: str = "cpu"):
         self.bundle = DataBundle(data_dir)
         self.checkpoint_path = checkpoint
-        self.config: ExperimentConfig = config_from_dict(
-            load_checkpoint(checkpoint)["config"]
-        )
+        self.config: ExperimentConfig = config_from_dict(load_checkpoint(checkpoint)["config"])
         self.config.device = device
         self.model = load_trained_model(self.bundle, self.config, checkpoint, device)
         self.device = next(self.model.parameters()).device
@@ -103,9 +101,7 @@ class Predictor:
             raise ValueError("Target inhibition must be finite (fraction units)")
         missing = [drug for drug in (drug_a, drug_b) if drug not in self.drug_lookup]
         if missing:
-            raise ValueError(
-                f"No released feature representation for drug(s): {missing}"
-            )
+            raise ValueError(f"No released feature representation for drug(s): {missing}")
         if expression is None:
             if cell_id not in self.cell_lookup:
                 raise ValueError(
@@ -115,9 +111,7 @@ class Predictor:
         if np.shape(expression) != (self.bundle.cell_features.shape[1],) or not (
             np.isfinite(expression).all()
         ):
-            raise ValueError(
-                "Cell feature vector has wrong dimension or non-finite values"
-            )
+            raise ValueError("Cell feature vector has wrong dimension or non-finite values")
         first, second = sorted((drug_a, drug_b))
 
         def tensor(value: Any) -> torch.Tensor:
@@ -176,22 +170,17 @@ class Predictor:
         not claimed modes of the density after nonlinear transformation.
         """
         if samples < 0 or seed < 0 or (grid_size != 0 and grid_size < 2):
-            raise ValueError(
-                "samples/seed must be nonnegative and grid_size either 0 or >=2"
-            )
+            raise ValueError("samples/seed must be nonnegative and grid_size either 0 or >=2")
         params = self.distribution(cell_id, drug_a, drug_b, inhibition, expression)
         # CPU sampling uses a local RNG and does not perturb training/global state.
         params = MixtureParameters(
-            *(
-                getattr(params, key).cpu()
-                for key in ("logits", "means", "scales", "correlations")
-            )
+            *(getattr(params, key).cpu() for key in ("logits", "means", "scales", "correlations"))
         )
         means = params.means.numpy()[0].astype(np.float64)
         candidates = self.bundle.dose_transform.inverse(means)
-        point = self.bundle.dose_transform.inverse(
-            params.mixture_mean.numpy().astype(np.float64)
-        )[0]
+        point = self.bundle.dose_transform.inverse(params.mixture_mean.numpy().astype(np.float64))[
+            0
+        ]
         train = self.bundle.observations.loc[self.bundle.observations.split == "train"]
         train_range = (float(train.inhibition.min()), float(train.inhibition.max()))
         result = {
@@ -203,9 +192,7 @@ class Predictor:
             "dataset_fingerprint": self.bundle.manifest["fingerprint"],
             "drug_order_policy": "canonical input, output restored to requested order",
             "training_inhibition_range": train_range,
-            "target_outside_training_range": not train_range[0]
-            <= inhibition
-            <= train_range[1],
+            "target_outside_training_range": not train_range[0] <= inhibition <= train_range[1],
             "weights": params.weights.numpy()[0],
             "means_scaled": means,
             "standard_deviations_scaled": params.scales.numpy()[0],
@@ -223,9 +210,7 @@ class Predictor:
         }
         arrays = {}
         if samples:
-            draws = sample_mixture(
-                params, samples, torch.Generator().manual_seed(seed)
-            ).numpy()[0]
+            draws = sample_mixture(params, samples, torch.Generator().manual_seed(seed)).numpy()[0]
             doses = self.bundle.dose_transform.inverse(draws.astype(np.float64))
             arrays["samples_um"] = doses
             arrays["samples_nonnegative"] = (doses >= 0).all(axis=-1)
@@ -242,10 +227,7 @@ class Predictor:
                 bound_sources = [first_source, second_source]
             else:
                 bound_sources = ["caller-supplied", "caller-supplied"]
-            if any(
-                not np.isfinite([lo, hi]).all() or lo < 0 or hi <= lo
-                for lo, hi in bounds
-            ):
+            if any(not np.isfinite([lo, hi]).all() or lo < 0 or hi <= lo for lo, hi in bounds):
                 raise ValueError("Grid bounds require finite 0 <= lower < upper")
             axes = [np.linspace(lo, hi, grid_size) for lo, hi in bounds]
             aa, bb = np.meshgrid(*axes, indexing="xy")
@@ -256,9 +238,7 @@ class Predictor:
                 count = min(4096, len(doses) - start)
                 expanded = MixtureParameters(
                     *(
-                        getattr(params, key).expand(
-                            count, *getattr(params, key).shape[1:]
-                        )
+                        getattr(params, key).expand(count, *getattr(params, key).shape[1:])
                         for key in ("logits", "means", "scales", "correlations")
                     )
                 )

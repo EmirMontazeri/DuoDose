@@ -22,9 +22,7 @@ from reverse_dose.utils import load_checkpoint, sha256_file
 class SyntheticResponses(Dataset):
     """Small measured response rows with disjoint final validation cells."""
 
-    def __init__(
-        self, cell_features: np.ndarray, drug_features: np.ndarray, split: str
-    ):
+    def __init__(self, cell_features: np.ndarray, drug_features: np.ndarray, split: str):
         self.cells = torch.from_numpy(cell_features)
         self.drugs = torch.from_numpy(drug_features)
         self.cell_ids = list(range(6)) * 2 + [0] if split == "train" else [6] * 5
@@ -38,9 +36,7 @@ class SyntheticResponses(Dataset):
             "drug_a": self.drugs[index % 3],
             "drug_b": self.drugs[(index + 1) % 3],
             "inhibition": torch.tensor([0.1 + 0.05 * index], dtype=torch.float32),
-            "target": torch.tensor(
-                [0.1 * index, 0.05 * index + 0.2], dtype=torch.float32
-            ),
+            "target": torch.tensor([0.1 * index, 0.05 * index + 0.2], dtype=torch.float32),
         }
 
 
@@ -49,6 +45,7 @@ class SyntheticBundle:
     """DataBundle's public training interface, independent of source parsing."""
 
     cell_features: np.ndarray
+    vae_features: np.ndarray
     drug_features: np.ndarray
     vae_train_indices: np.ndarray
     vae_validation_indices: np.ndarray
@@ -62,8 +59,10 @@ class SyntheticBundle:
 @pytest.fixture
 def bundle() -> SyntheticBundle:
     rng = np.random.default_rng(100)
+    features = rng.normal(size=(8, 6)).astype(np.float32)
     return SyntheticBundle(
-        rng.normal(size=(8, 6)).astype(np.float32),
+        features,
+        features.copy(),
         rng.normal(size=(3, 4)).astype(np.float32),
         np.array([0, 1, 2, 3, 4]),
         np.array([5]),
@@ -185,13 +184,10 @@ def test_interruption_restores_exact_experiment(
     assert reference_last["progress"]["epoch"] == 4
     assert reference_last["progress"]["best_epoch"] == 1
     assert (
-        reference_last["optimizer_state"]["param_groups"][0]["lr"]
-        < config.training.learning_rate
+        reference_last["optimizer_state"]["param_groups"][0]["lr"] < config.training.learning_rate
     )
     selected = load_checkpoint(resumed_best)
-    assert_exact_nested(
-        selected["model_state"], resumed_last["progress"]["best_model_state"]
-    )
+    assert_exact_nested(selected["model_state"], resumed_last["progress"]["best_model_state"])
     if stage == "model":
         pretrained = load_checkpoint(offline)["model_state"]
         for name, value in resumed_last["model_state"].items():
@@ -222,9 +218,7 @@ def test_resume_rejects_changed_identity_before_writing(
         monkeypatch.setattr(training, "environment_info", lambda: changed)
     with pytest.raises(ValueError, match="Resume rejected"):
         training.train_stage(bundle, config, run, "vae", resume=last)
-    assert files_before == {
-        path.name: sha256_file(path) for path in (run / "vae").iterdir()
-    }
+    assert files_before == {path.name: sha256_file(path) for path in (run / "vae").iterdir()}
 
 
 def test_selected_checkpoint_resume_rejected_without_artifact_changes(
@@ -237,9 +231,7 @@ def test_selected_checkpoint_resume_rejected_without_artifact_changes(
     files_before = {path.name: sha256_file(path) for path in (run / "vae").iterdir()}
     with pytest.raises(ValueError, match="selection/inference"):
         training.train_stage(bundle, config, run, "vae", resume=selected)
-    assert files_before == {
-        path.name: sha256_file(path) for path in (run / "vae").iterdir()
-    }
+    assert files_before == {path.name: sha256_file(path) for path in (run / "vae").iterdir()}
 
 
 def test_resume_cannot_overwrite_another_experiment_directory(
@@ -247,9 +239,7 @@ def test_resume_cannot_overwrite_another_experiment_directory(
     bundle: SyntheticBundle,
     config: ExperimentConfig,
 ) -> None:
-    last = training.train_stage(
-        bundle, config, tmp_path / "source", "vae", stop_after_steps=1
-    )
+    last = training.train_stage(bundle, config, tmp_path / "source", "vae", stop_after_steps=1)
     destination = tmp_path / "destination" / "vae"
     destination.mkdir(parents=True)
     metadata = destination / "experiment.json"
@@ -270,9 +260,7 @@ def test_completed_resume_restores_authoritative_selected_weights(
     selected = training.train_stage(bundle, config, run, "vae")
     authoritative = load_checkpoint(run / "vae" / "last.pt")
     selected.write_bytes(b"stale-or-incomplete-selected-artifact")
-    recovered = training.train_stage(
-        bundle, config, run, "vae", resume=run / "vae" / "last.pt"
-    )
+    recovered = training.train_stage(bundle, config, run, "vae", resume=run / "vae" / "last.pt")
     assert recovered == selected
     assert_exact_nested(
         load_checkpoint(recovered)["model_state"],
@@ -294,13 +282,13 @@ def test_vae_validation_uses_only_metadata_and_posterior_mean(
     checkpoint = load_checkpoint(selected)
     model = training.make_model(bundle, config, "vae")
     model.load_state_dict(checkpoint["model_state"])
-    data = training.MetadataDataset(bundle.cell_features, bundle.vae_validation_indices)
+    data = training.MetadataDataset(bundle.vae_features, bundle.vae_validation_indices)
     state_before = torch.get_rng_state().clone()
     metrics = training._validate(
         model, data, config.vae_training, torch.device("cpu"), "vae", config.vae_beta
     )
     assert torch.equal(state_before, torch.get_rng_state())
-    x = torch.from_numpy(bundle.cell_features[bundle.vae_validation_indices])
+    x = torch.from_numpy(bundle.vae_features[bundle.vae_validation_indices])
     with torch.no_grad():
         mean, logvar = model.encoder(x)
         expected = vae_loss(model.decoder(mean), x, mean, logvar, beta=config.vae_beta)
@@ -334,22 +322,15 @@ def test_completed_offline_resume_preserves_final_experiment_identity(
     run = tmp_path / "run"
     selected_vae = training.train_stage(bundle, config, run, "vae")
     original_file_hash = sha256_file(selected_vae)
-    original_encoder_identity = training._encoder_fingerprint(
-        load_checkpoint(selected_vae)
-    )
+    original_encoder_identity = training._encoder_fingerprint(load_checkpoint(selected_vae))
     interrupted_model = training.train_stage(
         bundle, config, run, "model", vae_checkpoint=selected_vae, stop_after_steps=1
     )
     original_experiment = load_checkpoint(interrupted_model)["experiment_id"]
     if reconstruct_selection:
         selected_vae.unlink()
-    restored_vae = training.train_stage(
-        bundle, config, run, "vae", resume=run / "vae" / "last.pt"
-    )
-    assert (
-        training._encoder_fingerprint(load_checkpoint(restored_vae))
-        == original_encoder_identity
-    )
+    restored_vae = training.train_stage(bundle, config, run, "vae", resume=run / "vae" / "last.pt")
+    assert training._encoder_fingerprint(load_checkpoint(restored_vae)) == original_encoder_identity
     if reconstruct_selection:
         # The reconstructed artifact carries later progress/optimizer counters.
         assert sha256_file(restored_vae) != original_file_hash

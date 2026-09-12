@@ -8,6 +8,13 @@ It includes:
 - AZ-Sanger cell-line metadata and molecular data.
 - Cell Model Passports RNA-seq and model metadata for offline cell-metadata VAE pretraining.
 
+The offline VAE extraction uses every model marked with Broad or Sanger
+cell-line RNA-seq in the released availability catalog. Dataset preparation
+groups related CMP identities and excludes all final-validation/test-only
+identity components before VAE preprocessing, training, or internal selection.
+The response validation/test expression vectors are transformed only with state
+fitted on VAE-training models.
+
 ## Sources
 
 - **AstraZeneca-Sanger DREAM Challenge:** downloaded from Synapse, project `syn4231880`.

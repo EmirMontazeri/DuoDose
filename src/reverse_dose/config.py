@@ -75,9 +75,7 @@ class EvaluationConfig:
     batch_size: int = 1024
     target_inhibition: float = 0.5
     target_tolerance: float = 0.05
-    inhibition_bin_edges: list[float] = field(
-        default_factory=lambda: [0, 0.25, 0.5, 0.75, 1]
-    )
+    inhibition_bin_edges: list[float] = field(default_factory=lambda: [0, 0.25, 0.5, 0.75, 1])
 
 
 @dataclass
@@ -95,9 +93,7 @@ class ExperimentConfig:
     vae: VAEConfig = field(default_factory=VAEConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     vae_training: TrainingConfig = field(
-        default_factory=lambda: TrainingConfig(
-            epochs=200, batch_size=16, learning_rate=0.001
-        )
+        default_factory=lambda: TrainingConfig(epochs=200, batch_size=16, learning_rate=0.001)
     )
     training: TrainingConfig = field(default_factory=TrainingConfig)
     vae_beta: float = 1.0
@@ -141,11 +137,7 @@ class ExperimentConfig:
             raise ValueError("sources.sources must contain dream and/or oi")
         if len(set(source.sources)) != len(source.sources):
             raise ValueError("Repeated matrix source")
-        if (
-            source.workers < 1
-            or source.fingerprint_bits < 1
-            or source.fingerprint_radius < 0
-        ):
+        if source.workers < 1 or source.fingerprint_bits < 1 or source.fingerprint_radius < 0:
             raise ValueError("Invalid source worker/fingerprint configuration")
         if source.max_matrices is not None and source.max_matrices < 1:
             raise ValueError("max_matrices must be null or positive")
@@ -172,11 +164,7 @@ class ExperimentConfig:
             ):
                 if getattr(stage, name) < 1:
                     raise ValueError(f"{name} must be positive")
-            if (
-                stage.learning_rate <= 0
-                or stage.weight_decay < 0
-                or stage.gradient_clip <= 0
-            ):
+            if stage.learning_rate <= 0 or stage.weight_decay < 0 or stage.gradient_clip <= 0:
                 raise ValueError("Invalid optimizer parameters")
             if not 0 < stage.scheduler_factor < 1:
                 raise ValueError("scheduler_factor must be in (0,1)")
@@ -228,9 +216,7 @@ def _construct(cls: type[T], values: dict[str, Any]) -> T:
     types = get_type_hints(cls)
     for name, value in values.items():
         if not _type_matches(value, types[name]):
-            raise ValueError(
-                f"{cls.__name__}.{name} has invalid type {type(value).__name__}"
-            )
+            raise ValueError(f"{cls.__name__}.{name} has invalid type {type(value).__name__}")
     return cls(**values)
 
 

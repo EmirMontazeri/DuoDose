@@ -23,6 +23,7 @@ split:
   seed: 42
   validation_fraction: 0.15
   test_fraction: 0.15
+  # Applied to leakage-safe CMP identity groups after final holdouts are removed.
   vae_validation_fraction: 0.15
 features:
   n_genes: 2000

@@ -89,8 +89,7 @@ def raw_dataset(tmp_path: Path) -> Path:
     )
     drugs.to_csv(az / "Drug_info_release.csv", index=False)
     drugs.to_excel(
-        az
-        / "Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx",
+        az / "Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx",
         sheet_name="Drug_Chemistry_Data",
         index=False,
     )
@@ -189,9 +188,7 @@ def test_atomic_preprocessing_orientation_cache_and_raw_integrity(
         name: hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in raw_hashes
     }
     with pytest.raises(ValueError, match="differ"):
-        preprocess_sources(
-            raw_dataset, {**config, "include_zero_doses": False}, destination
-        )
+        preprocess_sources(raw_dataset, {**config, "include_zero_doses": False}, destination)
     (destination / "drugs.npz").write_bytes(b"corrupted")
     with pytest.raises(ValueError, match="integrity"):
         preprocess_sources(raw_dataset, config, destination)
@@ -214,8 +211,7 @@ def test_source_cell_alias_requires_evidence(raw_dataset: Path) -> None:
 
 def test_unresolved_and_conflicting_cells_quarantined(raw_dataset: Path) -> None:
     write_matrix(
-        raw_dataset
-        / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
+        raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
         title="Cell1C",
     )
     destination = raw_dataset / "processed/quarantine"
@@ -234,8 +230,7 @@ def test_unresolved_and_conflicting_cells_quarantined(raw_dataset: Path) -> None
 
 def test_missing_and_zero_doses_generate_explicit_exclusions(raw_dataset: Path) -> None:
     write_matrix(
-        raw_dataset
-        / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
+        raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
         response=None,
     )
     destination = raw_dataset / "processed/no_zeros"
@@ -271,16 +266,15 @@ def test_duplicate_cosmic_mappings_fail(raw_dataset: Path) -> None:
 
 def test_out_of_range_response_is_not_clipped(raw_dataset: Path) -> None:
     write_matrix(
-        raw_dataset
-        / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx",
+        raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx",
         response=130,
     )
     destination = raw_dataset / "processed/out_of_range"
     manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
     assert manifest["counts"]["out_of_range_response_observations"] == 1
-    assert pd.read_parquet(
-        destination / "observations.parquet"
-    ).inhibition.min() == pytest.approx(-0.3)
+    assert pd.read_parquet(destination / "observations.parquet").inhibition.min() == pytest.approx(
+        -0.3
+    )
     assert json.loads((destination / "source_manifest.json").read_text())["config"][
         "include_zero_doses"
     ]
@@ -345,9 +339,7 @@ def test_pubchem_release_precedence_and_explicit_offline_mode(
         lambda *args, **kwargs: io.BytesIO(payload),
     )
     monkeypatch.setattr("reverse_dose.preprocess.time.sleep", lambda _: None)
-    resolved, _, _, paths = build_drug_features(
-        raw_dataset, 32, 2, resolve_pubchem=True
-    )
+    resolved, _, _, paths = build_drug_features(raw_dataset, 32, 2, resolve_pubchem=True)
     row = resolved.set_index("drug_id").loc["Unsupported"]
     assert row.supported
     assert row.pubchem_cid == 702
@@ -365,8 +357,7 @@ def test_released_gemcitibine_alias_has_exact_recorded_evidence(
     frame.to_csv(primary_path, index=False)
     frame["Drug name"] = [None, "Gemcitabine, Gemcitibine, Gemzar", None]
     frame.to_excel(
-        az
-        / "Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx",
+        az / "Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx",
         sheet_name="Drug_Chemistry_Data",
         index=False,
     )
@@ -410,9 +401,7 @@ def test_entire_missing_oi_grid_is_explicitly_excluded(raw_dataset: Path) -> Non
     assert parsed["points"] == []
     assert parsed["missing_points"] == [(1, 1), (1, 2), (2, 1), (2, 2)]
     destination = raw_dataset / "processed/oi"
-    manifest = preprocess_sources(
-        raw_dataset, {"workers": 1, "sources": ["oi"]}, destination
-    )
+    manifest = preprocess_sources(raw_dataset, {"workers": 1, "sources": ["oi"]}, destination)
     assert manifest["counts"]["parsed_matrices"] == 2
     assert manifest["counts"]["retained_matrices"] == 1
     assert manifest["counts"]["excluded_by_reason"] == {

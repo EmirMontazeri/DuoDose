@@ -14,11 +14,11 @@ and [decision register](docs/implementation_plan.md). Predicted coordinates are
 research outputs; coordinate accuracy alone does not establish achievement of a
 requested biological response.
 
-Recorded runs and verification evidence are described in
-[validation results](docs/validation_results.md). The full baseline and a
-six-run seed/protocol suite are available under `runs/`, together with a portable
-model export and an example probability map. Raw-data exclusions and severe
-out-of-range response/prediction cases remain visible in those results.
+Historical recorded runs and verification evidence are described in
+[validation results](docs/validation_results.md). Those artifacts predate the
+expanded, identity-grouped VAE population and remain under `runs/` for audit;
+they are not checkpoints of the current preprocessing schema. Raw-data exclusions
+and severe out-of-range response/prediction cases remain visible in those results.
 The [complete source validation](docs/source_validation.md) records all DREAM
 and OI matrix counts, retained populations, label conflicts and missing grids.
 
@@ -42,7 +42,12 @@ audit, use `uv run python audit_dataset.py`.
 
 The default pipeline uses the corrected DREAM matrices and CMP RNA-seq. It never
 rewrites `dataset/raw/`. RNA-seq extraction streams the full archive and retains
-only the 85 mapped DREAM models; it does not extract the entire 6.1 GB CSV to disk.
+every model catalogued with Broad or Sanger cell-line RNA-seq (1,643 candidates
+in the current catalog); it does not extract the 6.1 GB CSV to disk. Preparation
+first fixes the final response split, groups related CMP identities, removes all
+validation/test-only identity groups from the complete offline VAE population,
+then splits every remaining profile between VAE training and internal validation.
+Only VAE-training profiles fit gene selection, imputation and scaling.
 
 The supplied chemistry includes 42 numeric PubChem identifiers requiring exact
 CID resolution. With `sources.resolve_pubchem: true`, the first preparation
@@ -60,7 +65,7 @@ than silently reducing the selected cohort.
 First perform the short real-source integration check:
 
 ```bash
-uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke
+uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-expanded-vae
 ```
 
 The smoke configuration uses 240 systematically selected matrices, small feature
@@ -70,7 +75,7 @@ artifact generation; they are not scientific performance estimates.
 Train the complete default baseline with:
 
 ```bash
-uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2
+uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-expanded-vae
 ```
 
 `run` prepares the source tables and expression, constructs grouped splits and
@@ -80,11 +85,11 @@ data. Use `--skip-test` to defer test evaluation while developing an experiment.
 The full run may be long; progress, validation scores, learning rates, gradient
 norms and checkpoints are visible in the terminal and persistent logs.
 
-Resume either configuration without changing its settings:
+Resume a run created with the current schema without changing its settings:
 
 ```bash
-uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke --resume
-uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2 --resume
+uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-expanded-vae --resume
+uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-expanded-vae --resume
 ```
 
 SIGINT/SIGTERM requests checkpoint creation after the active minibatch completes.
@@ -93,9 +98,9 @@ kill resumes from the most recent completed checkpoint. Existing runs require
 `--resume`; a changed dataset, configuration, encoder, code or runtime is rejected
 as a different experiment. Start a new output directory for changed experiments.
 
-The included smoke, full-baseline and six-suite runs match the current source
-hashes. Use the normal `--resume` commands above to verify or continue them.
-Choose a fresh run directory whenever changing code or experimental settings.
+The included `runs/smoke`, `runs/v2` and `runs/suite` artifacts use the earlier
+85-model expression extraction and intentionally fail current continuation
+identity checks. Choose a fresh run directory for the expanded-VAE pipeline.
 
 ## Execute stages separately
 

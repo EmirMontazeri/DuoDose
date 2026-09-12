@@ -66,9 +66,7 @@ def experiment(tmp_path_factory: pytest.TempPathFactory) -> TrainedExperiment:
     )
     config.evaluation.batch_size = 7  # Exercise unequal final evaluation batches.
     offline = train_stage(bundle, config, root / "run", "vae")
-    checkpoint = train_stage(
-        bundle, config, root / "run", "model", vae_checkpoint=offline
-    )
+    checkpoint = train_stage(bundle, config, root / "run", "model", vae_checkpoint=offline)
     return TrainedExperiment(root, data_dir, bundle, config, offline, checkpoint)
 
 
@@ -79,9 +77,7 @@ def predictor_for(experiment: TrainedExperiment) -> Predictor:
 class ConstantGaussian(torch.nn.Module):
     """Analytically specified output used only to test physical density mapping."""
 
-    def __init__(
-        self, mean: tuple[float, float], scales: tuple[float, float], rho: float
-    ):
+    def __init__(self, mean: tuple[float, float], scales: tuple[float, float], rho: float):
         super().__init__()
         self.mean, self.scales, self.rho = mean, scales, rho
 
@@ -100,9 +96,7 @@ def test_trained_evaluation_reports_observation_and_group_metrics(
     experiment: TrainedExperiment,
 ) -> None:
     output = tmp_path / "evaluation"
-    report = evaluate(
-        experiment.bundle, experiment.config, experiment.checkpoint, output
-    )
+    report = evaluate(experiment.bundle, experiment.config, experiment.checkpoint, output)
     predictions = pd.read_parquet(output / "predictions.parquet")
     expected_rows = experiment.bundle.observations.loc[
         experiment.bundle.observations.split.eq("test")
@@ -117,9 +111,7 @@ def test_trained_evaluation_reports_observation_and_group_metrics(
         * (doses[:, 1] + transform.reference_um)
         * transform.scale**2
     )
-    np.testing.assert_allclose(
-        predictions.nll_um, predictions.nll - independent_log_jacobian
-    )
+    np.testing.assert_allclose(predictions.nll_um, predictions.nll - independent_log_jacobian)
     selected = (
         np.abs(predictions.inhibition - experiment.config.evaluation.target_inhibition)
         <= experiment.config.evaluation.target_tolerance
@@ -162,9 +154,7 @@ def test_canonical_request_order_restores_every_coordinate_and_grid(
             getattr(canonical, field), getattr(reversed_order, field), rtol=0, atol=0
         )
     bounds = ((0.0, 1.0), (0.0, 2.0))
-    original, original_grid = predictor.predict(
-        "c00", "d0", "d1", 0.5, grid_size=31, bounds=bounds
-    )
+    original, original_grid = predictor.predict("c00", "d0", "d1", 0.5, grid_size=31, bounds=bounds)
     swapped, swapped_grid = predictor.predict(
         "c00", "d1", "d0", 0.5, grid_size=31, bounds=bounds[::-1]
     )
@@ -181,9 +171,7 @@ def test_canonical_request_order_restores_every_coordinate_and_grid(
         rtol=2e-5,
         atol=1e-8,
     )
-    assert original["grid"][
-        "approximate_unconditional_mass_in_rectangle"
-    ] == pytest.approx(
+    assert original["grid"]["approximate_unconditional_mass_in_rectangle"] == pytest.approx(
         swapped["grid"]["approximate_unconditional_mass_in_rectangle"], rel=2e-6
     )
 
@@ -202,9 +190,7 @@ def test_physical_density_and_integrated_mass_match_independent_gaussian(
     transform = experiment.bundle.dose_transform
     a, b = np.meshgrid(arrays["dose_a_um"], arrays["dose_b_um"], indexing="xy")
     doses = np.stack((a.ravel(), b.ravel()), axis=-1)
-    coordinates = (
-        np.log1p(doses / transform.reference_um) - transform.mean
-    ) / transform.scale
+    coordinates = (np.log1p(doses / transform.reference_um) - transform.mean) / transform.scale
     covariance = [
         [scales[0] ** 2, rho * scales[0] * scales[1]],
         [rho * scales[0] * scales[1], scales[1] ** 2],
@@ -214,9 +200,7 @@ def test_physical_density_and_integrated_mass_match_independent_gaussian(
         * (doses[:, 1] + transform.reference_um)
         * transform.scale**2
     )
-    expected_density = (
-        multivariate_normal(mean=mean, cov=covariance).pdf(coordinates) * jacobian
-    )
+    expected_density = multivariate_normal(mean=mean, cov=covariance).pdf(coordinates) * jacobian
     np.testing.assert_allclose(
         arrays["density_per_um2"].ravel(), expected_density, rtol=3e-5, atol=1e-7
     )
@@ -232,9 +216,9 @@ def test_physical_density_and_integrated_mass_match_independent_gaussian(
         return norm.pdf((first - mean[0]) / scales[0]) / scales[0] * probability
 
     exact_mass = quad(conditional_mass, lower[0], upper[0], epsabs=1e-11)[0]
-    assert result["grid"][
-        "approximate_unconditional_mass_in_rectangle"
-    ] == pytest.approx(exact_mass, abs=1e-4)
+    assert result["grid"]["approximate_unconditional_mass_in_rectangle"] == pytest.approx(
+        exact_mass, abs=1e-4
+    )
     assert exact_mass < 0.99  # Detect unwanted normalization to the requested grid.
 
 
@@ -261,12 +245,8 @@ def test_new_cell_expression_aligns_ids_aggregates_and_imputes(
     expected = transform.transform(values[None], genes)[0]
     np.testing.assert_array_equal(transformed, expected)
     assert transformed[1] == 0.0
-    first = predictor.distribution(
-        "unseen-cell", "d0", "d1", 0.5, expression=transformed
-    )
-    second = predictor.distribution(
-        "another-unseen-name", "d0", "d1", 0.5, expression=transformed
-    )
+    first = predictor.distribution("unseen-cell", "d0", "d1", 0.5, expression=transformed)
+    second = predictor.distribution("another-unseen-name", "d0", "d1", 0.5, expression=transformed)
     torch.testing.assert_close(first.means, second.means, rtol=0, atol=0)
     pd.DataFrame({"gene_id": genes, "rsem_tpm": [np.nan] * len(genes)}).to_csv(
         tmp_path / "missing.csv", index=False
@@ -294,9 +274,7 @@ def test_invalid_inference_requests_fail_clearly(
     with pytest.raises(ValueError, match="wrong dimension"):
         predictor.distribution("new-cell", "d0", "d1", 0.5, expression=np.ones(2))
     with pytest.raises(ValueError, match="Grid bounds"):
-        predictor.predict(
-            "c00", "d0", "d1", 0.5, grid_size=10, bounds=((-1.0, 2.0), (0.0, 2.0))
-        )
+        predictor.predict("c00", "d0", "d1", 0.5, grid_size=10, bounds=((-1.0, 2.0), (0.0, 2.0)))
     for value in (-1.0, float("inf")):
         pd.DataFrame(
             {
@@ -370,8 +348,6 @@ def test_prediction_writer_creates_standalone_artifacts(
     write_prediction(output, result, arrays)
     assert (output / "prediction.json").is_file()
     assert (output / "distribution.npz").is_file()
-    assert (
-        (output / "probability_map.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
-    )
+    assert (output / "probability_map.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     with pytest.raises(FileExistsError):
         write_prediction(output, result, arrays)

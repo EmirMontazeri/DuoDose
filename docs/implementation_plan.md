@@ -57,17 +57,22 @@ or forward-response model will be invented.
   immutable cache. This explicit identifier-resolution step preserves coverage;
   it introduces no guessed compounds. An optional local-only baseline excludes
   numeric-only identifiers. Both modes exclude the seven known structure gaps.
-- Stream CMP RNA-seq for mapped DREAM cells, with `gene_id` as the stable key.
-  Aggregate multiple finite, nonnegative TPM measurements for each model/gene by
-  arithmetic mean and record multiplicities/source fields. Log1p TPM; select
-  variable genes and fit imputation/standardization on the internal VAE-training
-  cells alone, excluding even its internal metadata-validation cohort.
+- Stream CMP RNA-seq for every catalogued Broad/Sanger RNA-seq cell-line model,
+  with `gene_id` as the stable key. Aggregate multiple finite, nonnegative TPM
+  measurements for each model/gene by arithmetic mean and record
+  multiplicities/source fields. Log1p TPM; select variable genes and fit
+  imputation/standardization on the internal VAE-training models alone, excluding
+  its internal metadata-validation cohort and every final evaluation identity.
 - Seeded 70/15/15 cell-disjoint splits are the cold-start baseline. All replicates,
   doses and reversed pairs for a cell stay together. Provide a grouped warm
   completion alternative, grouping all replicates of a cell/unordered pair.
-- The offline VAE baseline uses training DREAM cells only, with a deterministic
-  internal metadata validation subset. Neither final validation nor test cells
-  enter VAE fitting or preprocessing. Do not automatically add external cells.
+- The offline VAE uses the maximum released CMP cell-line RNA-seq population.
+  Stable sample/patient/database IDs, normalized model names and parent
+  relationships define conservative identity components. Final
+  validation/test-only components are excluded before the VAE split; related
+  models cannot cross boundaries. Every remaining profile enters VAE training or
+  its deterministic internal validation subset. Neither final validation nor test
+  metadata enter VAE fitting, internal selection or preprocessing.
 - Offline objective: summed Gaussian reconstruction squared error (one-half)
   plus analytic diagonal-Gaussian KL to N(0,I), averaged over cells. Final objective:
   exact stable correlated bivariate mixture negative log likelihood (NLL).

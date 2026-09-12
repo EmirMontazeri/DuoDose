@@ -148,7 +148,7 @@
       "oi_corrected_matrices": 20489
     },
     "fail_count": 0,
-    "generated_at_utc": "2026-09-11T15:22:34.486838+00:00",
+    "generated_at_utc": "2026-09-11T17:22:02.000952+00:00",
     "known_accepted_source_limitations": {
       "biologics_without_small_molecule_smiles": {
         "ADAM17": "MEDI3622; monoclonal antibody",
@@ -1886,14 +1886,14 @@
     "source_hashes": {
       "__init__.py": "b7014d5a665037ad75469efa3ef532a3efe0b9c1d3d08e419f3e4c3d0b8b8932",
       "__main__.py": "9c17e476b86eb84153bfcdb286b0735ee16212344f11580665b02a80c3345613",
-      "cli.py": "c3b47b1be056aeefde762ce6fa58674e7c144a8ecdc975ecc0b470b269468363",
+      "cli.py": "0338d98d74e287f0db8cc83b24b7ca8538acb1abe6c5bc7996745673bf39e36f",
       "config.py": "5173ba6a04220f1c98bb7d14514f7c2c326856858bb7e628175e6427e018f65b",
-      "data.py": "4791010d5e4f5154b9590377ebcc5bb1297391df60beff60c038e6227d2f2fa8",
+      "data.py": "91fab0598484aedfc71e349c201d678f3afe5c17c6ecce0c577f7e3863beac44",
       "evaluation.py": "7953cdcc3cff19d24159c50281834e20a7c7c9802ec81a3e704d150c5b4df281",
       "inference.py": "5d8379fb749e2d533f14c9c149b5a7f3b303f2eeb521ac8bcf0d3c16f6335abe",
       "models.py": "58aa841f9e81368ad8136ad68ec884260a9bf472de7b1723b1f036a7e26b5671",
       "preprocess.py": "f4bc459e2439c46c74033690c84974ad0ba8f6e0b6992eccfa22da92eaad09ed",
-      "training.py": "82d6166f6afecc6fd7cc1372ec870ef9afbfcf5d07b2ee741303498cd75abebf",
+      "training.py": "a59049c47ab014fb7c7f3cf3482d5dfa83c1bf06bf38d901435d20762bbb508a",
       "utils.py": "2bb09963edd7bd536a288322fde3e8b071e39484ba8e7638667dc71a10c755f6"
     }
   },

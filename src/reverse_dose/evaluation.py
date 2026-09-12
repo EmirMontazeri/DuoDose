@@ -84,9 +84,7 @@ def metric_summary(frame: pd.DataFrame) -> dict[str, Any]:
         result[name] = float(frame[name].mean())
     for domain in ("scaled", "um"):
         result[f"mae_{domain}"] = float(frame[f"absolute_error_{domain}"].mean())
-        result[f"rmse_{domain}"] = math.sqrt(
-            float(frame[f"squared_error_{domain}"].mean())
-        )
+        result[f"rmse_{domain}"] = math.sqrt(float(frame[f"squared_error_{domain}"].mean()))
         for coordinate in ("a", "b"):
             result[f"mae_{coordinate}_{domain}"] = float(
                 frame[f"absolute_error_{coordinate}_{domain}"].mean()
@@ -124,18 +122,12 @@ def evaluate(
     parameter_rows: dict[str, list[np.ndarray]] = {
         key: [] for key in ("weights", "means", "scales", "correlations", "indices")
     }
-    LOGGER.info(
-        "Evaluating %d %s observations using %s", len(dataset), split, checkpoint
-    )
+    LOGGER.info("Evaluating %d %s observations using %s", len(dataset), split, checkpoint)
     for number, raw in enumerate(loader):
         indices = raw["index"].numpy()
         batch = {key: value.to(device) for key, value in raw.items()}
-        parameters = model(
-            batch["cell"], batch["inhibition"], batch["drug_a"], batch["drug_b"]
-        )
-        swapped = model(
-            batch["cell"], batch["inhibition"], batch["drug_b"], batch["drug_a"]
-        )
+        parameters = model(batch["cell"], batch["inhibition"], batch["drug_a"], batch["drug_b"])
+        swapped = model(batch["cell"], batch["inhibition"], batch["drug_b"], batch["drug_a"])
         log_prob = mixture_log_prob(parameters, batch["target"])
         swap_log_prob = mixture_log_prob(swapped, batch["target"].flip(-1))
         mean = parameters.mixture_mean.cpu().numpy().astype(np.float64)
@@ -149,15 +141,9 @@ def evaluate(
         frame["nll"] = -log_prob.cpu().numpy()
         frame["nll_um"] = frame["nll"].to_numpy() - jacobian
         frame["swap_mean_l1_scaled"] = (
-            (parameters.mixture_mean - swapped.mixture_mean.flip(-1))
-            .abs()
-            .mean(-1)
-            .cpu()
-            .numpy()
+            (parameters.mixture_mean - swapped.mixture_mean.flip(-1)).abs().mean(-1).cpu().numpy()
         )
-        frame["swap_abs_log_density_difference"] = (
-            (log_prob - swap_log_prob).abs().cpu().numpy()
-        )
+        frame["swap_abs_log_density_difference"] = (log_prob - swap_log_prob).abs().cpu().numpy()
         frame["invalid_point_fraction"] = (point_um < 0).any(axis=1).astype(float)
         for domain, predicted, measured in (
             ("scaled", mean, target),
@@ -168,12 +154,8 @@ def evaluate(
             frame[f"squared_error_{domain}"] = np.square(difference).mean(axis=1)
             for j, coordinate in enumerate(("a", "b")):
                 frame[f"predicted_{coordinate}_{domain}"] = predicted[:, j]
-                frame[f"absolute_error_{coordinate}_{domain}"] = np.abs(
-                    difference[:, j]
-                )
-                frame[f"squared_error_{coordinate}_{domain}"] = np.square(
-                    difference[:, j]
-                )
+                frame[f"absolute_error_{coordinate}_{domain}"] = np.abs(difference[:, j])
+                frame[f"squared_error_{coordinate}_{domain}"] = np.square(difference[:, j])
         if not np.isfinite(frame.select_dtypes(include="number").to_numpy()).all():
             raise FloatingPointError(
                 "Non-finite evaluation metric; inspect covariance/dose scaling"
@@ -208,9 +190,7 @@ def evaluate(
         table.to_csv(output_dir / f"by_{label}.csv", index=False)
         groups[f"macro_{label}_nll"] = float(table.nll.mean())
     bins = [-np.inf, *config.evaluation.inhibition_bin_edges, np.inf]
-    results["inhibition_bin"] = pd.cut(results.inhibition, bins, right=False).astype(
-        str
-    )
+    results["inhibition_bin"] = pd.cut(results.inhibition, bins, right=False).astype(str)
     bin_records = [
         {"inhibition_bin": key, **metric_summary(frame)}
         for key, frame in results.groupby("inhibition_bin", sort=True)

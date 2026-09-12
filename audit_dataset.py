@@ -86,9 +86,7 @@ KNOWN_UNRESOLVED_AGENT_STRUCTURE_GAPS = {
     "SLC16A4",
 }
 
-KNOWN_STRUCTURE_GAPS = (
-    set(KNOWN_BIOLOGIC_NO_SMILES) | KNOWN_UNRESOLVED_AGENT_STRUCTURE_GAPS
-)
+KNOWN_STRUCTURE_GAPS = set(KNOWN_BIOLOGIC_NO_SMILES) | KNOWN_UNRESOLVED_AGENT_STRUCTURE_GAPS
 
 
 # -----------------------------------------------------------------------------
@@ -437,17 +435,14 @@ def parse_dose_matrix(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description=("Final audit of the Proposal V2 dataset.")
-    )
+    parser = argparse.ArgumentParser(description=("Final audit of the Proposal V2 dataset."))
 
     parser.add_argument(
         "--root",
         type=Path,
         default=Path(__file__).resolve().parent,
         help=(
-            "Project root containing dataset/. "
-            "Defaults to the directory containing this script."
+            "Project root containing dataset/. " "Defaults to the directory containing this script."
         ),
     )
 
@@ -505,10 +500,7 @@ def main() -> int:
         "corrected OI matrices": az / "DREAM_OI_matrices_corrected",
         "drug information": az / "Drug_info_release.csv",
         "supplemental chemistry": az
-        / (
-            "Extra DrugChemistryData to release "
-            "for Nat Comms FINAL RELEASE_200219.xlsx"
-        ),
+        / ("Extra DrugChemistryData to release " "for Nat Comms FINAL RELEASE_200219.xlsx"),
         "DREAM cell metadata": dream_molecular / "cell_info.csv",
         "DREAM expression": dream_molecular / "gex.csv",
         "DREAM molecular archive": dream_molecular / "Sanger_molecular_data.zip",
@@ -609,11 +601,7 @@ def main() -> int:
         record(
             "Corrected OI matrices",
             "FAIL",
-            (
-                f"{len(oi_matrices):,} found; "
-                f"expected at least "
-                f"{EXPECTED_OI_MATRICES:,}."
-            ),
+            (f"{len(oi_matrices):,} found; " f"expected at least " f"{EXPECTED_OI_MATRICES:,}."),
         )
 
     # -------------------------------------------------------------------------
@@ -669,10 +657,7 @@ def main() -> int:
         record(
             "DREAM drug population",
             "WARN",
-            (
-                f"{len(used_drugs)} unique drugs found; "
-                f"expected {EXPECTED_DREAM_DRUGS}."
-            ),
+            (f"{len(used_drugs)} unique drugs found; " f"expected {EXPECTED_DREAM_DRUGS}."),
         )
 
     if malformed_filenames:
@@ -734,11 +719,7 @@ def main() -> int:
             record(
                 "DREAM cell metadata",
                 "WARN",
-                (
-                    f"{len(dream)} cell lines found; "
-                    f"expected "
-                    f"{EXPECTED_DREAM_CELLS}."
-                ),
+                (f"{len(dream)} cell lines found; " f"expected " f"{EXPECTED_DREAM_CELLS}."),
             )
 
         else:
@@ -777,9 +758,7 @@ def main() -> int:
             0,
         )
 
-        print(
-            f"DREAM gex.csv: " f"{gene_count:,} genes x " f"{cell_count} cell columns"
-        )
+        print(f"DREAM gex.csv: " f"{gene_count:,} genes x " f"{cell_count} cell columns")
 
         if gene_count >= 10_000 and cell_count >= 80:
 
@@ -885,9 +864,7 @@ def main() -> int:
         missing_model_columns = required_model_columns - set(models.columns)
 
         if missing_model_columns:
-            raise RuntimeError(
-                ("CMP model metadata lacks: " f"{sorted(missing_model_columns)}")
-            )
+            raise RuntimeError(("CMP model metadata lacks: " f"{sorted(missing_model_columns)}"))
 
         if dream is None:
             raise RuntimeError("DREAM cell metadata unavailable")
@@ -931,11 +908,7 @@ def main() -> int:
             record(
                 "DREAM-CMP COSMIC uniqueness",
                 "FAIL",
-                (
-                    f"{len(ambiguous)} DREAM "
-                    "COSMIC identifier(s) map "
-                    "to multiple CMP models."
-                ),
+                (f"{len(ambiguous)} DREAM " "COSMIC identifier(s) map " "to multiple CMP models."),
                 {
                     "ambiguous_cosmic_ids": ambiguous,
                 },
@@ -950,9 +923,7 @@ def main() -> int:
             )
 
         # One lookup row per COSMIC identifier.
-        model_map_unique = model_map.sort_values("model_id").drop_duplicates(
-            "COSMIC_KEY"
-        )
+        model_map_unique = model_map.sort_values("model_id").drop_duplicates("COSMIC_KEY")
 
         mapped = dream_map.merge(
             model_map_unique,
@@ -967,11 +938,7 @@ def main() -> int:
             record(
                 "DREAM-CMP cell mapping",
                 "PASS",
-                (
-                    f"{matched_count}/"
-                    f"{len(dream)} DREAM cells "
-                    "mapped by COSMIC ID."
-                ),
+                (f"{matched_count}/" f"{len(dream)} DREAM cells " "mapped by COSMIC ID."),
             )
 
         else:
@@ -1025,9 +992,7 @@ def main() -> int:
 
             with zipfile.ZipFile(rnaseq_zip) as z:
 
-                csv_members = [
-                    name for name in z.namelist() if name.lower().endswith(".csv")
-                ]
+                csv_members = [name for name in z.namelist() if name.lower().endswith(".csv")]
 
                 if not csv_members:
                     raise RuntimeError(("RNA-seq ZIP contains " "no CSV file."))
@@ -1154,11 +1119,7 @@ def main() -> int:
                 record(
                     "RNA-seq DREAM-cell coverage",
                     "FAIL",
-                    (
-                        f"{len(missing_usable)} "
-                        "mapped DREAM cell(s) lack "
-                        "usable RSEM TPM."
-                    ),
+                    (f"{len(missing_usable)} " "mapped DREAM cell(s) lack " "usable RSEM TPM."),
                     {
                         "missing_model_ids": missing_usable,
                     },
@@ -1217,9 +1178,7 @@ def main() -> int:
 
         primary_missing_columns = required_chemistry_columns - set(primary.columns)
 
-        supplement_missing_columns = required_chemistry_columns - set(
-            supplement.columns
-        )
+        supplement_missing_columns = required_chemistry_columns - set(supplement.columns)
 
         if primary_missing_columns:
             raise RuntimeError(
@@ -1228,10 +1187,7 @@ def main() -> int:
 
         if supplement_missing_columns:
             raise RuntimeError(
-                (
-                    "Supplemental chemistry table lacks: "
-                    f"{sorted(supplement_missing_columns)}"
-                )
+                ("Supplemental chemistry table lacks: " f"{sorted(supplement_missing_columns)}")
             )
 
         # ---------------------------------------------------------------------
@@ -1263,11 +1219,7 @@ def main() -> int:
             record(
                 "Primary chemistry identifiers",
                 "WARN",
-                (
-                    f"{len(primary_duplicates)} "
-                    "duplicated ChallengeName "
-                    "identifier(s) found."
-                ),
+                (f"{len(primary_duplicates)} " "duplicated ChallengeName " "identifier(s) found."),
                 {
                     "duplicates": primary_duplicates,
                 },
@@ -1314,14 +1266,10 @@ def main() -> int:
 
         chem["structure_primary"] = chem[f"{CHEM_COL}_primary"].map(clean_structure)
 
-        chem["structure_supplement"] = chem[f"{CHEM_COL}_supplement"].map(
-            clean_structure
-        )
+        chem["structure_supplement"] = chem[f"{CHEM_COL}_supplement"].map(clean_structure)
 
         # Prefer primary; otherwise use supplemental.
-        chem["structure"] = chem["structure_primary"].combine_first(
-            chem["structure_supplement"]
-        )
+        chem["structure"] = chem["structure_primary"].combine_first(chem["structure_supplement"])
 
         unique_chemistry_names = set(chem["ChallengeName"].dropna().astype(str))
 
@@ -1363,10 +1311,7 @@ def main() -> int:
             record(
                 "Chemistry release population",
                 "PASS",
-                (
-                    f"{len(unique_chemistry_names)} "
-                    "unique challenge compounds/agents found."
-                ),
+                (f"{len(unique_chemistry_names)} " "unique challenge compounds/agents found."),
             )
 
         else:
@@ -1383,13 +1328,9 @@ def main() -> int:
 
         missing_used = sorted(used_drugs - names_with_structure)
 
-        known_biologic_missing = sorted(
-            set(missing_used) & set(KNOWN_BIOLOGIC_NO_SMILES)
-        )
+        known_biologic_missing = sorted(set(missing_used) & set(KNOWN_BIOLOGIC_NO_SMILES))
 
-        known_unresolved_missing = sorted(
-            set(missing_used) & KNOWN_UNRESOLVED_AGENT_STRUCTURE_GAPS
-        )
+        known_unresolved_missing = sorted(set(missing_used) & KNOWN_UNRESOLVED_AGENT_STRUCTURE_GAPS)
 
         unexpected_missing = sorted(set(missing_used) - KNOWN_STRUCTURE_GAPS)
 
@@ -1436,16 +1377,11 @@ def main() -> int:
             record(
                 "Used-drug chemistry coverage",
                 "FAIL",
-                (
-                    f"{len(unexpected_missing)} "
-                    "unexpected used agent(s) "
-                    "lack chemistry."
-                ),
+                (f"{len(unexpected_missing)} " "unexpected used agent(s) " "lack chemistry."),
                 {
                     "unexpected_missing": unexpected_missing,
                     "known_biologics_without_smiles": {
-                        name: KNOWN_BIOLOGIC_NO_SMILES[name]
-                        for name in known_biologic_missing
+                        name: KNOWN_BIOLOGIC_NO_SMILES[name] for name in known_biologic_missing
                     },
                     "known_unresolved_agents": known_unresolved_missing,
                 },
@@ -1466,8 +1402,7 @@ def main() -> int:
                 ),
                 {
                     "biologics_without_small_molecule_smiles": {
-                        name: KNOWN_BIOLOGIC_NO_SMILES[name]
-                        for name in known_biologic_missing
+                        name: KNOWN_BIOLOGIC_NO_SMILES[name] for name in known_biologic_missing
                     },
                     "unresolved_challenge_agents": known_unresolved_missing,
                 },
@@ -1478,11 +1413,7 @@ def main() -> int:
             record(
                 "Used-drug chemistry coverage",
                 "PASS",
-                (
-                    f"All {len(used_drugs)} "
-                    "used DREAM agents have "
-                    "directly usable chemistry."
-                ),
+                (f"All {len(used_drugs)} " "used DREAM agents have " "directly usable chemistry."),
             )
 
     except Exception as e:
@@ -1656,13 +1587,9 @@ def main() -> int:
             # Do not search the entire absolute path,
             # because the project itself contains the word
             # "combination".
-            is_combination_directory = any(
-                "combination" in part for part in directory_parts
-            )
+            is_combination_directory = any("combination" in part for part in directory_parts)
 
-            is_monotherapy_directory = any(
-                "monotherapy" in part for part in directory_parts
-            )
+            is_monotherapy_directory = any("monotherapy" in part for part in directory_parts)
 
             if is_combination_directory and not is_monotherapy_directory:
 
@@ -1785,9 +1712,7 @@ def main() -> int:
             if column not in dream.columns:
                 continue
 
-            known_cell_names.update(
-                normalize_name(value) for value in dream[column].dropna()
-            )
+            known_cell_names.update(normalize_name(value) for value in dream[column].dropna())
 
         unmatched_cells = {
             cell: count

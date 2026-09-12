@@ -136,8 +136,7 @@ def event(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(
-            canonical_json({"time": datetime.now(timezone.utc).isoformat(), **payload})
-            + "\n"
+            canonical_json({"time": datetime.now(timezone.utc).isoformat(), **payload}) + "\n"
         )
         handle.flush()
 

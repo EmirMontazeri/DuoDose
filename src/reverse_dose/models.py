@@ -90,14 +90,10 @@ def _matrix(tensor: Tensor, width: int, name: str) -> None:
 
 def _same_device_dtype(reference: Tensor, tensor: Tensor, name: str) -> None:
     if tensor.device != reference.device or tensor.dtype != reference.dtype:
-        raise ValueError(
-            f"{name} must use device {reference.device} and dtype {reference.dtype}"
-        )
+        raise ValueError(f"{name} must use device {reference.device} and dtype {reference.dtype}")
 
 
-def _mlp(
-    input_dim: int, hidden_dims: tuple[int, ...], output_dim: int
-) -> nn.Sequential:
+def _mlp(input_dim: int, hidden_dims: tuple[int, ...], output_dim: int) -> nn.Sequential:
     layers: list[nn.Module] = []
     previous = input_dim
     for width in hidden_dims:
@@ -147,9 +143,7 @@ class VariationalAutoencoder(nn.Module):
         self.input_dim = input_dim
         self.config = config
         self.encoder = VAEEncoder(input_dim, config)
-        self.decoder = _mlp(
-            config.latent_dim, tuple(reversed(config.hidden_dims)), input_dim
-        )
+        self.decoder = _mlp(config.latent_dim, tuple(reversed(config.hidden_dims)), input_dim)
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """Return reconstructed metadata, posterior mean, and log variance."""
@@ -186,11 +180,7 @@ def vae_loss(
         if tensor.ndim != 2 or tensor.shape[0] == 0:
             raise ValueError(f"{name} must be a nonempty rank-two batch")
         _same_device_dtype(x, tensor, name)
-    if (
-        reconstruction.shape != x.shape
-        or mu.shape != logvar.shape
-        or mu.shape[0] != x.shape[0]
-    ):
+    if reconstruction.shape != x.shape or mu.shape != logvar.shape or mu.shape[0] != x.shape[0]:
         raise ValueError(
             "VAE reconstruction/input and posterior tensor dimensions are incompatible"
         )
@@ -226,19 +216,14 @@ class MixtureParameters:
             _same_device_dtype(self.logits, tensor, name)
         if self.logits.ndim != 2 or min(self.logits.shape) < 1:
             raise ValueError("logits must have shape [B, M] with B, M > 0")
-        if (
-            self.means.shape != (*self.logits.shape, 2)
-            or self.scales.shape != self.means.shape
-        ):
+        if self.means.shape != (*self.logits.shape, 2) or self.scales.shape != self.means.shape:
             raise ValueError("means and scales must have shape [B, M, 2]")
         if self.correlations.shape != self.logits.shape:
             raise ValueError("correlations must have shape [B, M]")
         if not (self.scales > 0).all():
             raise ValueError("All Gaussian standard deviations must be positive")
         if not (self.correlations.abs() < 1).all():
-            raise ValueError(
-                "All Gaussian correlations must lie strictly inside (-1, 1)"
-            )
+            raise ValueError("All Gaussian correlations must lie strictly inside (-1, 1)")
 
     @property
     def weights(self) -> Tensor:
@@ -276,10 +261,7 @@ class ReverseDoseModel(nn.Module):
         if pretrained_encoder is not None:
             if not isinstance(pretrained_encoder, VAEEncoder):
                 raise ValueError("pretrained_encoder must be a VAEEncoder")
-            if (
-                pretrained_encoder.input_dim != cell_dim
-                or pretrained_encoder.config != vae_config
-            ):
+            if pretrained_encoder.input_dim != cell_dim or pretrained_encoder.config != vae_config:
                 raise ValueError(
                     "Pretrained VAE encoder is incompatible with the requested cell dimension/configuration"
                 )
@@ -373,11 +355,7 @@ def mixture_log_prob(params: MixtureParameters, target: Tensor) -> Tensor:
     _same_device_dtype(params.logits, target, "target")
     if target.shape[0] != params.logits.shape[0]:
         raise ValueError("Target batch size must match mixture batch size")
-    dtype = (
-        torch.float32
-        if target.dtype in (torch.float16, torch.bfloat16)
-        else target.dtype
-    )
+    dtype = torch.float32 if target.dtype in (torch.float16, torch.bfloat16) else target.dtype
     means, scales = params.means.to(dtype), params.scales.to(dtype)
     rho = params.correlations.to(dtype)
     normalized = (target.to(dtype).unsqueeze(1) - means) / scales
@@ -410,9 +388,7 @@ def mixture_nll(
         return values.sum()
     if reduction == "none":
         return values
-    raise ValueError(
-        f"Unsupported reduction {reduction!r}; expected 'mean', 'sum', or 'none'"
-    )
+    raise ValueError(f"Unsupported reduction {reduction!r}; expected 'mean', 'sum', or 'none'")
 
 
 @torch.no_grad()
@@ -427,9 +403,7 @@ def sample_mixture(
     """
     params.validate()
     _positive_integer(n_samples, "n_samples")
-    indices = torch.multinomial(
-        params.weights, n_samples, replacement=True, generator=generator
-    )
+    indices = torch.multinomial(params.weights, n_samples, replacement=True, generator=generator)
     selected_means = params.means.gather(1, indices.unsqueeze(-1).expand(-1, -1, 2))
     selected_scales = params.scales.gather(1, indices.unsqueeze(-1).expand(-1, -1, 2))
     rho = params.correlations.gather(1, indices)

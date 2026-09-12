@@ -107,12 +107,23 @@ listed in the exclusion table. No surrogate small molecule is assigned.
 
 ## Cell expression and fitting populations
 
-CMP `gene_id` is the stable feature key. The RNA-seq archive is streamed in full;
-only the 85 mapped DREAM models are retained. For each model/gene, the raw feature
-is the arithmetic mean of all finite, nonnegative `rsem_tpm` measurements across
-the available datasets/sources. The extraction records source/dataset/duplicate
-counts and the number of measurements per model/gene. Missing measurements remain
-NaN. No external CMP model is automatically added to VAE training.
+CMP `gene_id` is the stable feature key. The RNA-seq archive is streamed in full.
+The offline source population is every model marked as having Broad or Sanger
+**cell-line** RNA-seq in the released CMP availability catalog; organoid-only
+profiles are not cell lines and are outside the proposal's input population. The
+current catalog contains 1,643 such models. Models without any usable archive
+measurement are excluded and recorded; every mapped response model is required
+to have usable expression. For each model/gene, the raw feature is the arithmetic
+mean of all finite, nonnegative `rsem_tpm` measurements across the available
+datasets/sources. Extraction records the availability/model-list hashes,
+source/dataset/duplicate counts, measurement counts and exclusions.
+
+Leakage control operates on conservative CMP identity components, not model names
+alone. Exact stable sample, patient, COSMIC, Broad/CCLE and RRID identifiers,
+normalized model names, and declared parent relationships connect related model
+records. Generic or missing identifiers never connect records. For the cold-start
+protocol, response cells in one identity component are assigned as a group, so a
+related cell cannot cross the final train/validation/test boundary.
 
 The default cold-start split first sorts distinct retained cell identifiers,
 permutes them with NumPy `default_rng(seed)`, and assigns approximately 15% to
@@ -122,22 +133,29 @@ pair belonging to a cell stays in that cell's split. Split memberships and exact
 counts are saved; no observation-row splitting occurs.
 
 The alternative `cell_pair` protocol applies the same seeded group allocation to
-`(cell_id, unordered drug pair)`, keeping every matrix/replicate for the pair
-together. Cells shared with final training may supply metadata to the VAE;
-validation/test-only cells cannot. The manifest records overlapping cells. This
-protocol measures grouped warm completion and must be reported separately from
-the cell-disjoint result.
+`(CMP identity component, unordered drug pair)`, keeping every related model,
+matrix and replicate for the pair together. Cells shared with final training may
+supply metadata to the VAE because the warm task explicitly observes those cells;
+validation/test-only identity components cannot. The manifest records overlapping
+cells. This protocol measures grouped warm completion and must be reported
+separately from the cell-disjoint result.
 
-Within the final training cells, an internal metadata-only VAE validation subset
-uses `default_rng(SeedSequence([split_seed, 1]))`, with default fraction 0.15.
-At least two VAE training cells and one internal validation cell are required.
-**Only VAE-training cells fit gene selection, imputation and expression scaling.**
-Final validation/test metadata and the internal VAE-validation metadata never fit
-these transforms. The internal VAE-validation cells can subsequently appear in
-final-model response training, as their role is offline encoder selection.
+After the response split is fixed, every expression identity component belonging
+exclusively to final validation or test is removed from the complete offline VAE
+population. This exclusion applies to VAE optimization, internal VAE validation,
+gene selection, imputation and scaling. Every remaining external or final-training
+cell-line profile is used in the offline stage. Related models stay together while
+`default_rng(SeedSequence([split_seed, 1]))` assigns identity components to VAE
+training or the internal metadata-only validation subset (default fraction 0.15).
+At least two VAE-training identity components and one internal validation component
+are required. **Only VAE-training models fit gene selection, imputation and
+expression scaling.** Internal VAE-validation models never fit these transforms.
+Final validation/test metadata are transformed only after fitting, exactly as an
+unseen inference input would be. Manifests store all eligible, selected, validation
+and evaluation-excluded model and identity lists so this boundary is auditable.
 
 For raw TPM \(T*{cg}\), let \(L*{cg}=\log(1+T\_{cg})\). Compute each gene's mean
-from observed VAE-training measurements and impute its missing log-expression
+from observed VAE-training-model measurements and impute its missing log-expression
 with that mean. Rank genes by population variance of the imputed VAE-training
 matrix, breaking ties by ascending gene ID; discard unobserved and zero-variance
 genes. Select up to `n_genes` (default 2,000) and standardize:

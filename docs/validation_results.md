@@ -1,5 +1,11 @@
 # Recorded results and verification
 
+> Historical-result notice (pipeline schema 1): these runs used the earlier
+> 85-model expression extraction and 48/8 cold-split VAE cohorts. The current
+> pipeline uses all eligible CMP cell-line RNA-seq models with identity-grouped
+> leakage exclusion. Existing metrics remain an audit of the old checkpoints and
+> must not be presented as results of the expanded-VAE pipeline.
+
 This review, dated 2026-09-11, inspected the completed artifacts already present
 in `runs/`. It did not start another full research training run. The full DREAM
 baseline, six configured experiments, and reduced engineering smoke run have
@@ -132,12 +138,34 @@ data contain 7,524 observations, split into 5,364/1,080/1,080 rows across
 1.589423776 in standardized coordinates, and coordinate MAE is 0.440632200 µM.
 This is an integration check, separate from the full experiments above.
 
-The current smoke bundle is `dataset/splits/v2_02710809f6d5`, fingerprint
+The historical smoke bundle is `dataset/splits/v2_02710809f6d5`, fingerprint
 `57b0da81e5249d2185a42843049934c9b00af61e8b42492c514f45a158f1d87d`.
-The current full bundle is `dataset/splits/v2_477d7b35d901`. Both runs
+The historical full bundle is `dataset/splits/v2_477d7b35d901`. Both runs
 were regenerated using the final code, including source schema `source-v2.3`.
 
-The recorded complete test-suite check passed 93 tests, and Ruff checks passed.
+## Expanded-VAE pipeline verification
+
+On 2026-09-12, full preparation under data schema 2 produced
+`dataset/splits/v2_f36085a4152b`, fingerprint
+`68afd06a9a93634e8419b1e81e40da079a3f1db1f49ca1522f8e88c32accc36b`.
+The expression source contains all 1,643 catalogued Broad/Sanger cell-line
+RNA-seq models. Twenty-five models in 24 final validation/test identity groups
+were excluded, including one related external profile. All 1,618 remaining
+models were assigned: 1,379 models (1,303 identity groups) to VAE training and
+239 models (230 groups) to internal VAE validation. Pairwise intersections among
+VAE-training, VAE-validation and excluded identity groups are all zero. The final
+response train/validation/test identity-group intersections are also all zero.
+
+A real-source two-epoch integration run is saved under
+`runs/smoke-expanded-vae`. It used 1,375/246 VAE train/internal-validation
+profiles and 4,716/1,080/1,728 final train/validation/test response rows. The
+offline VAE and frozen-encoder final stage both completed; validation NLL was
+1.777403712 in standardized log-dose coordinates. Test evaluation was
+deliberately skipped, so this run verifies integration and does not report or
+use test performance.
+
+The historical recorded check passed 93 tests. The expanded-VAE implementation
+currently passes 96 tests and Ruff checks.
 Relevant checks include:
 
 - Source parsing, concentration units, identifier provenance, source
@@ -169,16 +197,17 @@ axes explicitly; this API convention does not alter the specified network.
 
 ## Reproducing the recorded code identity
 
-All 11 Python module hashes in the eight current model experiment records
-(`runs/smoke`, `runs/v2`, and the six suite runs) were compared with the
-current `src/reverse_dose` files and matched. The current runs use source schema
-`source-v2.3`, including explicit handling of entirely missing OI grids.
+At the time of the 2026-09-11 review, all 11 Python module hashes in the eight
+model experiment records (`runs/smoke`, `runs/v2`, and the six suite runs)
+matched that revision. They no longer match the expanded-VAE implementation and
+cannot be resumed under the current prepared-data schema. Their response source
+schema remains `source-v2.3`.
 
-Continue or verify an existing completed run from the repository root:
+Reproduce the current expanded-VAE protocol in fresh directories:
 
 ```bash
-uv run --frozen reverse-dose run --config configs/v2.yaml --run-dir runs/v2 --resume
-uv run --frozen reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke --resume
+uv run --frozen reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-expanded-vae
+uv run --frozen reverse-dose run --config configs/v2.yaml --run-dir runs/v2-expanded-vae
 ```
 
 To reproduce the declared protocol as a new experiment, choose a new run

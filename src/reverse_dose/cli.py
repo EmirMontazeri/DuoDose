@@ -17,10 +17,16 @@ from typing import Any
 import pandas as pd
 
 from .config import ExperimentConfig, load_config
-from .data import DataBundle, extract_expression, prepare_dataset
+from .data import (
+    EXPRESSION_POPULATION,
+    SCHEMA_VERSION as DATA_SCHEMA_VERSION,
+    DataBundle,
+    extract_expression,
+    prepare_dataset,
+)
 from .evaluation import evaluate
 from .inference import Predictor, export_model, write_prediction
-from .preprocess import SCHEMA_VERSION, map_cells, preprocess_sources
+from .preprocess import SCHEMA_VERSION as SOURCE_SCHEMA_VERSION, map_cells, preprocess_sources
 from .training import train_stage
 from .utils import (
     atomic_json,
@@ -38,16 +44,21 @@ LOGGER = logging.getLogger(__name__)
 def artifact_paths(config: ExperimentConfig) -> tuple[Path, Path, Path]:
     """Compute stable configuration-specific source and prepared paths."""
     root = Path(config.dataset_root)
-    source_key = fingerprint(
-        {"sources": asdict(config.sources), "schema": SCHEMA_VERSION}
-    )[:12]
+    source_key = fingerprint({"sources": asdict(config.sources), "schema": SOURCE_SCHEMA_VERSION})[
+        :12
+    ]
     source = root / "processed" / "dose_response" / f"v2_{source_key}"
-    expression = root / "processed" / "cell_expression" / "v2"
+    expression_key = fingerprint(
+        {"population": EXPRESSION_POPULATION, "schema": DATA_SCHEMA_VERSION}
+    )[:12]
+    expression = root / "processed" / "cell_expression" / f"v2_{expression_key}"
     split_key = fingerprint(
         {
             "source": source_key,
             "split": asdict(config.split),
             "features": asdict(config.features),
+            "data_schema": DATA_SCHEMA_VERSION,
+            "expression": expression_key,
         }
     )[:12]
     prepared = root / "splits" / f"v2_{split_key}"
@@ -153,7 +164,7 @@ def run(
         "vae_checkpoint": str(vae),
         "model_checkpoint": str(model),
     }
-    for split in (["validation", "test"] if evaluate_test else ["validation"]):
+    for split in ["validation", "test"] if evaluate_test else ["validation"]:
         output = run_dir / "evaluation" / split
         if resume and (output / "metrics.json").exists():
             from .utils import sha256_file
@@ -162,14 +173,10 @@ def run(
             if report["checkpoint_sha256"] != sha256_file(model) or (
                 report["dataset_fingerprint"] != bundle.manifest["fingerprint"]
             ):
-                raise ValueError(
-                    "Existing evaluation differs from resumed selected model"
-                )
+                raise ValueError("Existing evaluation differs from resumed selected model")
         else:
             if resume and output.exists():
-                preserved = output.with_name(
-                    f"{output.name}.interrupted.{uuid.uuid4().hex[:8]}"
-                )
+                preserved = output.with_name(f"{output.name}.interrupted.{uuid.uuid4().hex[:8]}")
                 output.rename(preserved)
                 LOGGER.warning(
                     "Preserved incomplete evaluation at %s; regenerating %s",
@@ -206,7 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
             stage.add_argument("--data-dir", type=Path)
     expression = sub.add_parser(
         "extract-expression",
-        help="Stream raw CMP RNA-seq for uniquely mapped DREAM cells",
+        help="Stream raw CMP RNA-seq for every available cell-line model",
     )
     _common_config(expression)
     expression.add_argument("--output", type=Path)
@@ -218,9 +225,7 @@ def build_parser() -> argparse.ArgumentParser:
         _common_config(stage)
         stage.add_argument("--data-dir", type=Path, required=True)
         stage.add_argument("--run-dir", type=Path, required=True)
-        stage.add_argument(
-            "--resume", type=Path, help="Explicit last.pt or epoch checkpoint"
-        )
+        stage.add_argument("--resume", type=Path, help="Explicit last.pt or epoch checkpoint")
         stage.add_argument(
             "--stop-after-steps",
             type=int,
@@ -233,9 +238,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluation.add_argument("--data-dir", type=Path, required=True)
     evaluation.add_argument("--checkpoint", type=Path, required=True)
     evaluation.add_argument("--output", type=Path, required=True)
-    evaluation.add_argument(
-        "--split", choices=["train", "validation", "test"], default="test"
-    )
+    evaluation.add_argument("--split", choices=["train", "validation", "test"], default="test")
     prediction = sub.add_parser(
         "predict", help="Predict dose distribution, candidates, samples and a 2D map"
     )
@@ -254,22 +257,16 @@ def build_parser() -> argparse.ArgumentParser:
     prediction.add_argument(
         "--inhibition", type=float, required=True, help="Fraction units: 0.5 means 50%%"
     )
-    prediction.add_argument(
-        "--expression", type=Path, help="New cell CSV: gene_id,rsem_tpm"
-    )
+    prediction.add_argument("--expression", type=Path, help="New cell CSV: gene_id,rsem_tpm")
     prediction.add_argument("--output", type=Path, required=True)
-    prediction.add_argument(
-        "--device", choices=["cpu", "mps", "cuda", "auto"], default="cpu"
-    )
+    prediction.add_argument("--device", choices=["cpu", "mps", "cuda", "auto"], default="cpu")
     prediction.add_argument("--samples", type=int, default=1000)
     prediction.add_argument("--seed", type=int, default=42)
     prediction.add_argument("--grid-size", type=int, default=100)
     prediction.add_argument(
         "--bounds", type=float, nargs=4, metavar=("A_MIN", "A_MAX", "B_MIN", "B_MAX")
     )
-    export = sub.add_parser(
-        "export", help="Create a self-contained portable prediction directory"
-    )
+    export = sub.add_parser("export", help="Create a self-contained portable prediction directory")
     export.add_argument("--data-dir", type=Path, required=True)
     export.add_argument("--checkpoint", type=Path, required=True)
     export.add_argument("--output", type=Path, required=True)
@@ -279,9 +276,7 @@ def build_parser() -> argparse.ArgumentParser:
     pipeline.add_argument("--source-dir", type=Path)
     pipeline.add_argument("--expression-dir", type=Path)
     pipeline.add_argument("--data-dir", type=Path)
-    pipeline.add_argument(
-        "--resume", action="store_true", help="Resume the same experiment"
-    )
+    pipeline.add_argument("--resume", action="store_true", help="Resume the same experiment")
     pipeline.add_argument(
         "--skip-test",
         action="store_true",
@@ -318,11 +313,7 @@ def main(argv: list[str] | None = None) -> None:
                     )
                 predictor = Predictor(args.data_dir, args.checkpoint, args.device)
             guard_output(args.output, Path(predictor.config.dataset_root))
-            expression = (
-                predictor.expression_from_csv(args.expression)
-                if args.expression
-                else None
-            )
+            expression = predictor.expression_from_csv(args.expression) if args.expression else None
             bounds = (
                 ((args.bounds[0], args.bounds[1]), (args.bounds[2], args.bounds[3]))
                 if args.bounds
@@ -339,9 +330,7 @@ def main(argv: list[str] | None = None) -> None:
                 grid_size=args.grid_size,
                 bounds=bounds,
             )
-            write_prediction(
-                args.output, result, arrays, Path(predictor.config.dataset_root)
-            )
+            write_prediction(args.output, result, arrays, Path(predictor.config.dataset_root))
             LOGGER.info(
                 "Point coordinates (µM): %s; nonnegative=%s",
                 result["point_coordinates_um"],
@@ -349,9 +338,7 @@ def main(argv: list[str] | None = None) -> None:
             )
             return
         if args.command == "export":
-            dataset_root = Path(
-                load_checkpoint(args.checkpoint)["config"]["dataset_root"]
-            )
+            dataset_root = Path(load_checkpoint(args.checkpoint)["config"]["dataset_root"])
             export_model(args.data_dir, args.checkpoint, args.output, dataset_root)
             return
         config = load_config(args.config)
@@ -382,9 +369,7 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "preprocess":
             source = args.source_dir or artifact_paths(config)[0]
             setup_logging(Path(config.dataset_root) / "manifests" / "v2_logs")
-            preprocess_sources(
-                Path(config.dataset_root), asdict(config.sources), source
-            )
+            preprocess_sources(Path(config.dataset_root), asdict(config.sources), source)
         elif args.command == "extract-expression":
             cells, _, _ = map_cells(Path(config.dataset_root), config.sources.aliases)
             setup_logging(Path(config.dataset_root) / "manifests" / "v2_logs")
@@ -429,9 +414,9 @@ def main(argv: list[str] | None = None) -> None:
                 evaluate_test=not args.skip_test,
             )
         elif args.command == "experiments":
-            if len(set(args.seeds)) != len(args.seeds) or len(
-                set(args.protocols)
-            ) != len(args.protocols):
+            if len(set(args.seeds)) != len(args.seeds) or len(set(args.protocols)) != len(
+                args.protocols
+            ):
                 raise ValueError("Experiment seeds and protocols must be unique")
             records = []
             for protocol in args.protocols:
@@ -447,13 +432,9 @@ def main(argv: list[str] | None = None) -> None:
                         resume=args.resume and (member_dir / "run.json").exists(),
                     )
                     if result["status"] != "complete":
-                        LOGGER.warning(
-                            "Experiment interrupted; resume the declared suite"
-                        )
+                        LOGGER.warning("Experiment interrupted; resume the declared suite")
                         return
-                    records.append(
-                        {"protocol": protocol, "seed": seed, **result["test"]}
-                    )
+                    records.append({"protocol": protocol, "seed": seed, **result["test"]})
             args.output.mkdir(parents=True, exist_ok=True)
             pd.DataFrame(records).to_csv(args.output / "experiments.csv", index=False)
             atomic_json(

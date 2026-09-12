@@ -60,9 +60,7 @@ def test_log_probability_matches_torch_full_covariance() -> None:
     )
     target = torch.randn(batch, 2, dtype=torch.float64)
     actual = mixture_log_prob(params, target)
-    torch.testing.assert_close(
-        actual, reference.log_prob(target), rtol=1e-11, atol=1e-11
-    )
+    torch.testing.assert_close(actual, reference.log_prob(target), rtol=1e-11, atol=1e-11)
     torch.testing.assert_close(params.mixture_mean, reference.mean)
     torch.testing.assert_close(mixture_nll(params, target, "sum"), -actual.sum())
     torch.testing.assert_close(mixture_nll(params, target, "none"), -actual)
@@ -77,9 +75,7 @@ def test_vae_loss_matches_closed_form_and_has_gradients() -> None:
     assert result["reconstruction"].item() == pytest.approx(2.0)
     assert result["kl"].item() == pytest.approx(1.5 * (5.0 - math.log(2.0)))
     result["loss"].backward()
-    assert all(
-        torch.isfinite(value.grad).all() for value in (reconstruction, mu, logvar)
-    )
+    assert all(torch.isfinite(value.grad).all() for value in (reconstruction, mu, logvar))
 
 
 def test_vae_posterior_sampling_and_deterministic_mean() -> None:
@@ -109,14 +105,10 @@ def test_exact_paired_representations_swap() -> None:
 
 def test_frozen_encoder_stays_frozen_but_downstream_learns() -> None:
     model = small_model()
-    before = {
-        key: value.clone() for key, value in model.vae_encoder.state_dict().items()
-    }
+    before = {key: value.clone() for key, value in model.vae_encoder.state_dict().items()}
     model.train()
     assert model.training and not model.vae_encoder.training
-    assert not any(
-        parameter.requires_grad for parameter in model.vae_encoder.parameters()
-    )
+    assert not any(parameter.requires_grad for parameter in model.vae_encoder.parameters())
     result = model(*inputs())
     assert result.means.shape == result.scales.shape == (4, 2, 2)
     assert result.weights.shape == result.correlations.shape == (4, 2)
@@ -141,9 +133,7 @@ def test_encoder_transfer_copies_and_checks_configuration() -> None:
     assert model.vae_encoder is not vae.encoder
     assert all(parameter.requires_grad for parameter in vae.encoder.parameters())
     assert not hasattr(model, "decoder")
-    torch.testing.assert_close(
-        model.vae_encoder(inputs()[0])[0], vae.encode_mean(inputs()[0])
-    )
+    torch.testing.assert_close(model.vae_encoder(inputs()[0])[0], vae.encode_mean(inputs()[0]))
     with pytest.raises(ValueError, match="incompatible"):
         ReverseDoseModel(8, 5, config, ModelConfig(), vae.encoder)
 
@@ -171,9 +161,7 @@ def test_state_dict_roundtrip_is_exact() -> None:
     restored.load_state_dict(torch.load(payload, weights_only=True), strict=True)
     original, reloaded = model(*inputs()), restored(*inputs())
     for name in ("logits", "means", "scales", "correlations"):
-        torch.testing.assert_close(
-            getattr(original, name), getattr(reloaded, name), atol=0, rtol=0
-        )
+        torch.testing.assert_close(getattr(original, name), getattr(reloaded, name), atol=0, rtol=0)
 
 
 def test_sample_moments_and_reproducible_generator() -> None:
@@ -186,9 +174,7 @@ def test_sample_moments_and_reproducible_generator() -> None:
     samples = sample_mixture(params, 50000, torch.Generator().manual_seed(83))
     repeated = sample_mixture(params, 50000, torch.Generator().manual_seed(83))
     torch.testing.assert_close(samples, repeated, rtol=0, atol=0)
-    torch.testing.assert_close(
-        samples.mean(dim=1), params.mixture_mean, atol=0.04, rtol=0
-    )
+    torch.testing.assert_close(samples.mean(dim=1), params.mixture_mean, atol=0.04, rtol=0)
     covariance = torch.cov(samples[0].T)
     torch.testing.assert_close(
         covariance, torch.tensor([[4.0, 4.2], [4.2, 9.0]]), atol=0.12, rtol=0
@@ -205,9 +191,7 @@ def test_extreme_valid_covariance_has_finite_loss_and_gradients() -> None:
     )
     assert torch.isfinite(loss)
     loss.backward()
-    assert all(
-        torch.isfinite(value.grad).all() for value in (logits, means, scales, rho)
-    )
+    assert all(torch.isfinite(value.grad).all() for value in (logits, means, scales, rho))
 
 
 @pytest.mark.parametrize(

@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10", "ruff>=0.11"]
+dev = ["pytest>=8,<10", "ruff>=0.11", "black>=24.0",]
 
 [project.scripts]
 reverse-dose = "reverse_dose.cli:main"
@@ -31,6 +31,10 @@ filterwarnings = ["ignore:Workbook contains no default style:UserWarning"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]

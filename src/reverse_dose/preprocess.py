@@ -110,9 +110,7 @@ def _hash_file(path: Path) -> str:
 
 def _json_hash(value: Any) -> str:
     return hashlib.sha256(
-        json.dumps(
-            value, sort_keys=True, separators=(",", ":"), allow_nan=False
-        ).encode()
+        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()
 
 
@@ -139,9 +137,7 @@ def _cosmic(value: Any) -> str | None:
     return text.removesuffix(".0")
 
 
-def _required_columns(
-    frame: pd.DataFrame, columns: Iterable[str], source: Path
-) -> None:
+def _required_columns(frame: pd.DataFrame, columns: Iterable[str], source: Path) -> None:
     missing = set(columns) - set(frame.columns)
     if missing:
         raise ValueError(f"{source}: missing columns {sorted(missing)}")
@@ -159,13 +155,9 @@ def map_cells(
     """
     dataset_root = Path(dataset_root)
     dream_path = dataset_root / "raw/az_dream_molecular/cell_info.csv"
-    cmp_paths = sorted(
-        (dataset_root / "raw/cell_model_passports").glob("model_list_*.csv")
-    )
+    cmp_paths = sorted((dataset_root / "raw/cell_model_passports").glob("model_list_*.csv"))
     if len(cmp_paths) != 1:
-        raise ValueError(
-            f"Expected one immutable CMP model_list release, found {cmp_paths}"
-        )
+        raise ValueError(f"Expected one immutable CMP model_list release, found {cmp_paths}")
     cmp_path = cmp_paths[0]
     dream = pd.read_csv(dream_path, dtype=str)
     cmp = pd.read_csv(cmp_path, dtype=str, low_memory=False)
@@ -181,9 +173,7 @@ def map_cells(
         duplicates = relevant.loc[
             relevant["cosmic_id"].duplicated(False), ["cosmic_id", "model_id"]
         ]
-        raise ValueError(
-            f"Ambiguous CMP COSMIC mapping: {duplicates.to_dict('records')}"
-        )
+        raise ValueError(f"Ambiguous CMP COSMIC mapping: {duplicates.to_dict('records')}")
     joined = dream.merge(
         relevant[["cosmic_id", "model_id"]],
         on="cosmic_id",
@@ -212,14 +202,10 @@ def map_cells(
     for alias, spec in sorted((aliases or {}).items()):
         if not isinstance(spec, dict) or set(spec) != {"cell_id", "evidence"}:
             raise ValueError(f"Alias {alias!r} requires exactly cell_id and evidence")
-        if spec["cell_id"] not in set(joined["cell_id"]) or not _clean(
-            spec["evidence"]
-        ):
+        if spec["cell_id"] not in set(joined["cell_id"]) or not _clean(spec["evidence"]):
             raise ValueError(f"Alias {alias!r} has an unknown cell or missing evidence")
         normalized = normalize_cell_name(alias)
-        if not normalized or (
-            normalized in names and names[normalized] != spec["cell_id"]
-        ):
+        if not normalized or (normalized in names and names[normalized] != spec["cell_id"]):
             raise ValueError(f"Alias {alias!r} conflicts with released cell metadata")
         names[normalized] = spec["cell_id"]
         name_evidence[normalized].append(
@@ -286,9 +272,7 @@ def resolve_smiles(value: Any) -> tuple[str | None, str]:
             canonical.append(Chem.MolToSmiles(mol, canonical=True, isomericSmiles=True))
     if len(set(canonical)) != 1:
         return None, "ambiguous_semicolon_structures"
-    return canonical[0], (
-        "equivalent_semicolon_smiles" if len(canonical) > 1 else "valid_smiles"
-    )
+    return canonical[0], ("equivalent_semicolon_smiles" if len(canonical) > 1 else "valid_smiles")
 
 
 def _pubchem_property(payload: bytes, cid: int) -> tuple[str, str]:
@@ -297,17 +281,9 @@ def _pubchem_property(payload: bytes, cid: int) -> tuple[str, str]:
         data = json.loads(payload)
         properties = data["PropertyTable"]["Properties"]
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
-        raise ValueError(
-            f"PubChem CID {cid}: invalid property-response schema"
-        ) from exc
-    if (
-        not isinstance(properties, list)
-        or len(properties) != 1
-        or properties[0].get("CID") != cid
-    ):
-        raise ValueError(
-            f"PubChem CID {cid}: returned identifier is not the exact requested CID"
-        )
+        raise ValueError(f"PubChem CID {cid}: invalid property-response schema") from exc
+    if not isinstance(properties, list) or len(properties) != 1 or properties[0].get("CID") != cid:
+        raise ValueError(f"PubChem CID {cid}: returned identifier is not the exact requested CID")
     # PUG REST renamed IsomericSMILES to SMILES; support both documented response
     # names, never the connectivity-only property when stereo is requested.
     for key in ["SMILES", "IsomericSMILES"]:
@@ -315,13 +291,9 @@ def _pubchem_property(payload: bytes, cid: int) -> tuple[str, str]:
         if isinstance(value, str):
             smiles, status = resolve_smiles(value)
             if smiles is None or status != "valid_smiles":
-                raise ValueError(
-                    f"PubChem CID {cid}: returned SMILES cannot be validated by RDKit"
-                )
+                raise ValueError(f"PubChem CID {cid}: returned SMILES cannot be validated by RDKit")
             return smiles, key
-    raise ValueError(
-        f"PubChem CID {cid}: response lacks a stereochemical SMILES property"
-    )
+    raise ValueError(f"PubChem CID {cid}: response lacks a stereochemical SMILES property")
 
 
 def resolve_pubchem_cid(
@@ -348,7 +320,9 @@ def resolve_pubchem_cid(
         entry_dir / "response.json",
         entry_dir / "manifest.json",
     )
-    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/IsomericSMILES/JSON"
+    url = (
+        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/IsomericSMILES/JSON"
+    )
     if entry_dir.exists():
         if not response_path.is_file() or not manifest_path.is_file():
             raise ValueError(f"Incomplete immutable PubChem cache entry: {entry_dir}")
@@ -360,13 +334,11 @@ def resolve_pubchem_cid(
             or manifest.get("url") != url
             or manifest.get("response_sha256") != hashlib.sha256(payload).hexdigest()
         ):
-            raise ValueError(
-                f"PubChem cache integrity mismatch for CID {cid}: {entry_dir}"
-            )
+            raise ValueError(f"PubChem cache integrity mismatch for CID {cid}: {entry_dir}")
         smiles, property_name = _pubchem_property(payload, cid)
-        if smiles != manifest.get(
-            "canonical_isomeric_smiles"
-        ) or property_name != manifest.get("response_property"):
+        if smiles != manifest.get("canonical_isomeric_smiles") or property_name != manifest.get(
+            "response_property"
+        ):
             raise ValueError(f"PubChem cached structure mismatch for CID {cid}")
         LOGGER.info("Verified offline PubChem CID %d cache %s", cid, entry_dir)
         return smiles, manifest, [response_path, manifest_path]
@@ -466,24 +438,15 @@ def build_drug_features(
     )
     primary = pd.read_csv(primary_path, dtype=str)
     with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore", message="Workbook contains no default style.*"
-        )
-        supplement = pd.read_excel(
-            supplement_path, sheet_name="Drug_Chemistry_Data", dtype=str
-        )
+        warnings.filterwarnings("ignore", message="Workbook contains no default style.*")
+        supplement = pd.read_excel(supplement_path, sheet_name="Drug_Chemistry_Data", dtype=str)
     frames = [(primary, primary_path), (supplement, supplement_path)]
     indexed: list[dict[str, dict[str, Any]]] = []
     for frame, path in frames:
         _required_columns(frame, ["ChallengeName", CHEMISTRY_COLUMN], path)
         frame["ChallengeName"] = frame["ChallengeName"].map(_clean)
-        if (
-            frame["ChallengeName"].isna().any()
-            or frame["ChallengeName"].duplicated().any()
-        ):
-            raise ValueError(
-                f"{path}: drug ChallengeName values must be present and unique"
-            )
+        if frame["ChallengeName"].isna().any() or frame["ChallengeName"].duplicated().any():
+            raise ValueError(f"{path}: drug ChallengeName values must be present and unique")
         indexed.append(frame.set_index("ChallengeName").to_dict("index"))
     records, identifiers, fingerprints = [], [], []
     consumed_sources = [str(path.relative_to(dataset_root)) for _, path in frames]
@@ -491,16 +454,10 @@ def build_drug_features(
         radius=radius, fpSize=bits, includeChirality=False
     )
     for name in sorted(set(indexed[0]) | set(indexed[1])):
-        values = [
-            _clean(frame.get(name, {}).get(CHEMISTRY_COLUMN)) for frame in indexed
-        ]
+        values = [_clean(frame.get(name, {}).get(CHEMISTRY_COLUMN)) for frame in indexed]
         candidates = [resolve_smiles(value) for value in values]
         selected = next(
-            (
-                index
-                for index, (smiles, _) in enumerate(candidates)
-                if smiles is not None
-            ),
+            (index for index, (smiles, _) in enumerate(candidates) if smiles is not None),
             None,
         )
         canonical = candidates[selected][0] if selected is not None else None
@@ -533,9 +490,7 @@ def build_drug_features(
                     timeout_seconds=pubchem_timeout_seconds,
                     retries=pubchem_retries,
                 )
-                consumed_sources.extend(
-                    str(path.relative_to(dataset_root)) for path in cache_paths
-                )
+                consumed_sources.extend(str(path.relative_to(dataset_root)) for path in cache_paths)
                 selected, reason = cid_source, "resolved_exact_released_pubchem_cid"
         if name in KNOWN_BIOLOGICS:
             canonical, selected, reason = (
@@ -559,9 +514,7 @@ def build_drug_features(
             "primary_parse_status": candidates[0][1],
             "supplement_parse_status": candidates[1][1],
             "selected_source": (
-                str(frames[selected][1].relative_to(dataset_root))
-                if selected is not None
-                else None
+                str(frames[selected][1].relative_to(dataset_root)) if selected is not None else None
             ),
             "released_drug_name": _clean(indexed[1].get(name, {}).get("Drug name")),
             "known_biologic_identity": KNOWN_BIOLOGICS.get(name),
@@ -572,9 +525,7 @@ def build_drug_features(
             "pubchem_response_sha256": (
                 pubchem_manifest["response_sha256"] if pubchem_manifest else None
             ),
-            "pubchem_request_url": (
-                pubchem_manifest["url"] if pubchem_manifest else None
-            ),
+            "pubchem_request_url": (pubchem_manifest["url"] if pubchem_manifest else None),
             "pubchem_cache_manifest": (
                 f"processed/drug_features/pubchem/v1/{pubchem_cid}/manifest.json"
                 if pubchem_manifest
@@ -650,9 +601,7 @@ def parse_corrected_matrix(path: Path) -> dict[str, Any]:
     missing-response policy. Unexpected schema/numeric/unit errors always raise.
     """
     with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore", message="Workbook contains no default style.*"
-        )
+        warnings.filterwarnings("ignore", message="Workbook contains no default style.*")
         workbook = load_workbook(path, read_only=True, data_only=True)
     try:
         worksheet = workbook.worksheets[0]
@@ -670,9 +619,7 @@ def parse_corrected_matrix(path: Path) -> dict[str, Any]:
     first_column = [str(row[0]).strip().lower() for row in rows]
     first_row = [str(value).strip().lower() for value in rows[0]]
     if first_column.count("(=agent 1)") != 1 or first_row.count("(=agent 2)") != 1:
-        raise ValueError(
-            f"{path}: expected one Agent 1 row marker and Agent 2 column marker"
-        )
+        raise ValueError(f"{path}: expected one Agent 1 row marker and Agent 2 column marker")
     row_end, col_end = first_column.index("(=agent 1)"), first_row.index("(=agent 2)")
     if row_end < 3 or col_end < 3:
         raise ValueError(f"{path}: both dose axes require at least two points")
@@ -694,13 +641,10 @@ def parse_corrected_matrix(path: Path) -> dict[str, Any]:
         ([rows[r][0] for r in range(1, row_end)], list(rows[0][1:col_end])), start=1
     ):
         factor = concentration_factor_um(metadata[f"Unit{index}"])
-        axis = [
-            _number(value, f"{path}: Agent {index} dose axis") * factor
-            for value in raw_axis
-        ]
-        if any(value < 0 or not math.isfinite(value) for value in axis) or len(
-            set(axis)
-        ) != len(axis):
+        axis = [_number(value, f"{path}: Agent {index} dose axis") * factor for value in raw_axis]
+        if any(value < 0 or not math.isfinite(value) for value in axis) or len(set(axis)) != len(
+            axis
+        ):
             raise ValueError(
                 f"{path}: dose axis must contain unique finite nonnegative concentrations"
             )
@@ -738,9 +682,7 @@ def _parse_job(job: tuple[str, str, str]) -> tuple[str, str, dict[str, Any]]:
 def _effective_config(config: dict[str, Any]) -> dict[str, Any]:
     unknown = set(config) - set(DEFAULTS)
     if unknown:
-        raise ValueError(
-            f"Unknown source preprocessing configuration keys: {sorted(unknown)}"
-        )
+        raise ValueError(f"Unknown source preprocessing configuration keys: {sorted(unknown)}")
     effective = {**DEFAULTS, **config}
     if (
         not effective["sources"]
@@ -764,9 +706,7 @@ def _effective_config(config: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(effective["include_zero_doses"], bool) or not isinstance(
         effective["aliases"], dict
     ):
-        raise ValueError(
-            "include_zero_doses must be boolean and aliases must be a mapping"
-        )
+        raise ValueError("include_zero_doses must be boolean and aliases must be a mapping")
     if not isinstance(effective["resolve_pubchem"], bool):
         raise ValueError("resolve_pubchem must be boolean")
     for key in ["pubchem_timeout_seconds", "pubchem_retries"]:
@@ -795,9 +735,7 @@ def _safe_output(dataset_root: Path, output_dir: Path) -> None:
     raw = (dataset_root / "raw").resolve()
     target = output_dir.resolve()
     if target == raw or target.is_relative_to(raw) or raw.is_relative_to(target):
-        raise ValueError(
-            "Source preprocessing output must not overlap immutable dataset/raw"
-        )
+        raise ValueError("Source preprocessing output must not overlap immutable dataset/raw")
 
 
 def preprocess_sources(
@@ -818,9 +756,7 @@ def preprocess_sources(
     paths: list[tuple[str, Path]] = []
     source_counts = {}
     for source in effective["sources"]:
-        selected_paths = sorted(
-            (dataset_root / SOURCE_DIRECTORIES[source]).rglob("*.xlsx")
-        )
+        selected_paths = sorted((dataset_root / SOURCE_DIRECTORIES[source]).rglob("*.xlsx"))
         if not selected_paths:
             raise ValueError(f"No corrected {source} XLSX matrices found")
         source_counts[source] = len(selected_paths)
@@ -888,9 +824,7 @@ def preprocess_sources(
     manifest_path = output_dir / "source_manifest.json"
     if output_dir.exists():
         if not manifest_path.is_file():
-            raise FileExistsError(
-                f"Output exists without a complete source manifest: {output_dir}"
-            )
+            raise FileExistsError(f"Output exists without a complete source manifest: {output_dir}")
         manifest_checksum_path = output_dir / "source_manifest.sha256"
         if (
             not manifest_checksum_path.is_file()
@@ -921,9 +855,7 @@ def preprocess_sources(
         for relative, digest in cached["output_hashes"].items():
             if _hash_file(output_dir / relative) != digest:
                 raise ValueError(f"Cached artifact integrity mismatch: {relative}")
-        LOGGER.info(
-            "Reusing verified source cache %s (%s)", output_dir, identity_hash[:12]
-        )
+        LOGGER.info("Reusing verified source cache %s (%s)", output_dir, identity_hash[:12])
         return cached
     observations: list[dict[str, Any]] = []
     exclusions: list[dict[str, Any]] = []
@@ -949,14 +881,9 @@ def preprocess_sources(
             }
     malformed_dimensions = 0
     accepted_matrices = 0
-    jobs = [
-        (str(path), source, str(path.relative_to(dataset_root)))
-        for source, path in paths
-    ]
+    jobs = [(str(path), source, str(path.relative_to(dataset_root))) for source, path in paths]
     executor = (
-        ProcessPoolExecutor(max_workers=effective["workers"])
-        if effective["workers"] > 1
-        else None
+        ProcessPoolExecutor(max_workers=effective["workers"]) if effective["workers"] > 1 else None
     )
     try:
         parsed = (
@@ -969,34 +896,24 @@ def preprocess_sources(
             metadata = matrix["metadata"]
             filename = Path(relative).stem.split("&")
             if len(filename) != 4:
-                raise ValueError(
-                    f"{relative}: filename must have DrugA&DrugB&Cell&Experiment"
-                )
-            if matrix["declared_dimensions"] in {"A1", "A1:A1"} and matrix[
-                "actual_shape"
-            ] != [
+                raise ValueError(f"{relative}: filename must have DrugA&DrugB&Cell&Experiment")
+            if matrix["declared_dimensions"] in {"A1", "A1:A1"} and matrix["actual_shape"] != [
                 1,
                 1,
             ]:
                 malformed_dimensions += 1
             reasons: list[tuple[str, str]] = []
             raw_agent1, raw_agent2 = metadata["Agent1"], metadata["Agent2"]
-            filename_drugs = [
-                known_names.get(label.casefold(), label) for label in filename[:2]
-            ]
+            filename_drugs = [known_names.get(label.casefold(), label) for label in filename[:2]]
             agent1 = known_names.get(raw_agent1.casefold(), raw_agent1)
             agent2 = known_names.get(raw_agent2.casefold(), raw_agent2)
             if sorted(filename_drugs) != sorted([agent1, agent2]):
-                raise ValueError(
-                    f"{relative}: filename and internal drug labels disagree"
-                )
+                raise ValueError(f"{relative}: filename and internal drug labels disagree")
             unsupported = sorted({agent1, agent2} - supported)
             if unsupported:
                 reasons.append(("unsupported_drug_structure", json.dumps(unsupported)))
                 if effective["unsupported_drug_policy"] == "error":
-                    raise ValueError(
-                        f"{relative}: unsupported drug structures {unsupported}"
-                    )
+                    raise ValueError(f"{relative}: unsupported drug structures {unsupported}")
             title_cell, filename_cell = (
                 names.get(normalize_cell_name(metadata["Title"])),
                 names.get(normalize_cell_name(filename[2])),
@@ -1005,53 +922,33 @@ def preprocess_sources(
                 reasons.append(
                     (
                         "unresolved_cell_label",
-                        json.dumps(
-                            {"title": metadata["Title"], "filename": filename[2]}
-                        ),
+                        json.dumps({"title": metadata["Title"], "filename": filename[2]}),
                     )
                 )
-            if normalize_cell_name(metadata["Title"]) != normalize_cell_name(
-                filename[2]
-            ) and (
-                title_cell is None
-                or filename_cell is None
-                or title_cell != filename_cell
+            if normalize_cell_name(metadata["Title"]) != normalize_cell_name(filename[2]) and (
+                title_cell is None or filename_cell is None or title_cell != filename_cell
             ):
                 reasons.append(
                     (
                         "cell_label_mismatch",
-                        json.dumps(
-                            {"title": metadata["Title"], "filename": filename[2]}
-                        ),
+                        json.dumps({"title": metadata["Title"], "filename": filename[2]}),
                     )
                 )
             elif (
-                title_cell is not None
-                and filename_cell is not None
-                and title_cell != filename_cell
+                title_cell is not None and filename_cell is not None and title_cell != filename_cell
             ):
                 reasons.append(
                     (
                         "cell_label_mismatch",
-                        json.dumps(
-                            {"title": metadata["Title"], "filename": filename[2]}
-                        ),
+                        json.dumps({"title": metadata["Title"], "filename": filename[2]}),
                     )
                 )
             if effective["unresolved_cell_policy"] == "error" and any(
-                reason.startswith(("unresolved_cell", "cell_label"))
-                for reason, _ in reasons
+                reason.startswith(("unresolved_cell", "cell_label")) for reason, _ in reasons
             ):
-                raise ValueError(
-                    f"{relative}: unresolved or conflicting cell labels {reasons}"
-                )
-            if (
-                matrix["missing_points"]
-                and effective["missing_response_policy"] == "error"
-            ):
-                raise ValueError(
-                    f"{relative}: missing response points {matrix['missing_points']}"
-                )
+                raise ValueError(f"{relative}: unresolved or conflicting cell labels {reasons}")
+            if matrix["missing_points"] and effective["missing_response_policy"] == "error":
+                raise ValueError(f"{relative}: missing response points {matrix['missing_points']}")
             if not matrix["points"]:
                 reasons.append(
                     (
@@ -1092,9 +989,7 @@ def preprocess_sources(
                         matrix["dose1_um"][row - 1],
                         matrix["dose2_um"][column - 1],
                     )
-                    if not effective["include_zero_doses"] and (
-                        dose1 == 0 or dose2 == 0
-                    ):
+                    if not effective["include_zero_doses"] and (dose1 == 0 or dose2 == 0):
                         exclusions.append(
                             dict(
                                 source=source,
@@ -1147,9 +1042,7 @@ def preprocess_sources(
         if executor is not None:
             executor.shutdown(wait=True, cancel_futures=True)
     if not observations:
-        raise ValueError(
-            "No observations remain after explicit source inclusion policies"
-        )
+        raise ValueError("No observations remain after explicit source inclusion policies")
     observation_frame = pd.DataFrame(observations, columns=OBSERVATION_COLUMNS)
     if observation_frame["observation_id"].duplicated().any():
         raise ValueError("Generated observation IDs must be unique")
@@ -1185,21 +1078,16 @@ def preprocess_sources(
                 set(observation_frame["drug_a"]) | set(observation_frame["drug_b"])
             ),
             "incorrect_declared_dimensions_read_completely": malformed_dimensions,
-            "excluded_by_reason": dict(
-                sorted(Counter(exclusion_frame["reason"]).items())
-            ),
+            "excluded_by_reason": dict(sorted(Counter(exclusion_frame["reason"]).items())),
             "out_of_range_response_observations": int(
                 (
-                    (observation_frame["inhibition"] < 0)
-                    | (observation_frame["inhibition"] > 1)
+                    (observation_frame["inhibition"] < 0) | (observation_frame["inhibition"] > 1)
                 ).sum()
             ),
         },
     }
     output_dir.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(
-        tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=output_dir.parent)
-    )
+    staging = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=output_dir.parent))
     try:
         cells.to_parquet(staging / "cells.parquet", index=False)
         drugs.to_parquet(staging / "drugs.parquet", index=False)

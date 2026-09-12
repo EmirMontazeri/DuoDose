@@ -79,7 +79,7 @@ def _encoder_fingerprint(checkpoint: dict[str, Any]) -> str:
 
 
 class MetadataDataset(Dataset):
-    """Metadata-only VAE cohort; never loads response labels."""
+    """Metadata-only VAE model cohort; never loads response labels."""
 
     def __init__(self, features: np.ndarray, indices: np.ndarray):
         self.features = torch.as_tensor(features[indices], dtype=torch.float32)
@@ -109,9 +109,7 @@ def _loss(
         else:
             reconstruction, mean, logvar = model(batch)
         return vae_loss(reconstruction, batch, mean, logvar, beta=beta)
-    parameters = model(
-        batch["cell"], batch["inhibition"], batch["drug_a"], batch["drug_b"]
-    )
+    parameters = model(batch["cell"], batch["inhibition"], batch["drug_a"], batch["drug_b"])
     return {"loss": mixture_nll(parameters, batch["target"])}
 
 
@@ -128,9 +126,7 @@ def _validate(
     totals: dict[str, float] = {}
     for start in range(0, len(dataset), settings.batch_size):
         indices = torch.arange(start, min(start + settings.batch_size, len(dataset)))
-        losses = _loss(
-            model, _batch(dataset, indices, device), stage, beta, validation=True
-        )
+        losses = _loss(model, _batch(dataset, indices, device), stage, beta, validation=True)
         for key, value in losses.items():
             if not torch.isfinite(value).all():
                 raise FloatingPointError(f"Non-finite validation {key} in {stage}")
@@ -156,13 +152,9 @@ def make_model(
         if checkpoint["stage"] != "vae" or checkpoint["dataset_fingerprint"] != (
             bundle.manifest["fingerprint"]
         ):
-            raise ValueError(
-                "Offline VAE belongs to a different stage or prepared dataset"
-            )
+            raise ValueError("Offline VAE belongs to a different stage or prepared dataset")
         if not checkpoint.get("selection_only", False):
-            raise ValueError(
-                "Offline VAE transfer requires its selected best.pt checkpoint"
-            )
+            raise ValueError("Offline VAE transfer requires its selected best.pt checkpoint")
         if fingerprint(checkpoint["config"]["vae"]) != fingerprint(asdict(config.vae)):
             raise ValueError("Offline VAE architecture does not match configuration")
         vae = VariationalAutoencoder(cell_dim, config.vae)
@@ -205,25 +197,17 @@ def train_stage(
     settings = config.vae_training if stage == "vae" else config.training
     directory = run_dir / stage
     if directory.exists() and any(directory.iterdir()) and resume is None:
-        raise FileExistsError(
-            f"Stage already exists; explicitly resume {directory / 'last.pt'}"
-        )
+        raise FileExistsError(f"Stage already exists; explicitly resume {directory / 'last.pt'}")
     if stage == "model" and vae_checkpoint is None:
         raise ValueError("Final training requires a selected offline VAE checkpoint")
-    seed_everything(
-        config.seed + (stage == "model"), config.deterministic, config.threads
-    )
+    seed_everything(config.seed + (stage == "model"), config.deterministic, config.threads)
     device = resolve_device(config.device)
     model = make_model(bundle, config, stage, vae_checkpoint).to(device)
     if stage == "vae":
-        train_data = MetadataDataset(bundle.cell_features, bundle.vae_train_indices)
-        validation_data = MetadataDataset(
-            bundle.cell_features, bundle.vae_validation_indices
-        )
+        train_data = MetadataDataset(bundle.vae_features, bundle.vae_train_indices)
+        validation_data = MetadataDataset(bundle.vae_features, bundle.vae_validation_indices)
     else:
-        train_data, validation_data = bundle.dataset("train"), bundle.dataset(
-            "validation"
-        )
+        train_data, validation_data = bundle.dataset("train"), bundle.dataset("validation")
     if not len(train_data) or not len(validation_data):
         raise ValueError("Both training and validation cohorts must be nonempty")
     optimizer = torch.optim.Adam(
@@ -244,9 +228,7 @@ def train_stage(
         "config": config.to_dict(),
         "environment": env,
         "vae_encoder_fingerprint": (
-            _encoder_fingerprint(load_checkpoint(vae_checkpoint))
-            if vae_checkpoint
-            else None
+            _encoder_fingerprint(load_checkpoint(vae_checkpoint)) if vae_checkpoint else None
         ),
     }
     # The file hash records provenance, while experiment continuity depends on
@@ -283,9 +265,7 @@ def train_stage(
         if directory.exists() and any(directory.iterdir()):
             metadata_path = directory / "experiment.json"
             if not metadata_path.exists():
-                raise FileExistsError(
-                    "Resume destination is nonempty and lacks experiment.json"
-                )
+                raise FileExistsError("Resume destination is nonempty and lacks experiment.json")
             if read_json(metadata_path).get("experiment_id") != experiment_id:
                 raise ValueError("Resume destination belongs to a different experiment")
         model.load_state_dict(checkpoint["model_state"], strict=True)
@@ -396,9 +376,7 @@ def train_stage(
     def request_stop(signum: int, frame: Any) -> None:
         nonlocal interrupted
         interrupted = True
-        LOGGER.warning(
-            "Signal %s received; saving at the next minibatch boundary", signum
-        )
+        LOGGER.warning("Signal %s received; saving at the next minibatch boundary", signum)
 
     old_handlers = {}
     try:
@@ -413,17 +391,13 @@ def train_stage(
             return directory / "best.pt"
         while state["epoch"] < settings.epochs:
             if state["permutation"] is None:
-                state["permutation"] = torch.randperm(
-                    len(train_data), generator=generator
-                )
+                state["permutation"] = torch.randperm(len(train_data), generator=generator)
             permutation = state["permutation"]
             n_batches = math.ceil(len(permutation) / settings.batch_size)
             model.train()
             for batch_number in range(state["next_batch"], n_batches):
                 indices = permutation[
-                    batch_number
-                    * settings.batch_size : (batch_number + 1)
-                    * settings.batch_size
+                    batch_number * settings.batch_size : (batch_number + 1) * settings.batch_size
                 ]
                 batch = _batch(train_data, indices, device)
                 optimizer.zero_grad(set_to_none=True)
@@ -472,20 +446,14 @@ def train_stage(
                 if state["global_step"] % settings.checkpoint_every_steps == 0:
                     save(directory / "last.pt")
                 if interrupted or (
-                    stop_after_steps is not None
-                    and state["global_step"] >= stop_after_steps
+                    stop_after_steps is not None and state["global_step"] >= stop_after_steps
                 ):
                     save(directory / "last.pt")
-                    event(
-                        log_path, {"event": "interrupted", "step": state["global_step"]}
-                    )
+                    event(log_path, {"event": "interrupted", "step": state["global_step"]})
                     return directory / "last.pt"
-            validation = _validate(
-                model, validation_data, settings, device, stage, config.vae_beta
-            )
+            validation = _validate(model, validation_data, settings, device, stage, config.vae_beta)
             training = {
-                key: value / state["epoch_count"]
-                for key, value in state["epoch_totals"].items()
+                key: value / state["epoch_count"] for key, value in state["epoch_totals"].items()
             }
             improved = validation["loss"] < state["best_validation"]
             if improved:
