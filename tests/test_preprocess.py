@@ -15,13 +15,17 @@ import pandas as pd
 import pytest
 
 from reverse_dose.preprocess import (
+    INHIBITION_QUALITY_MAX,
+    INHIBITION_QUALITY_MIN,
+    INHIBITION_QUALITY_REASON,
+    build_drug_features,
     concentration_factor_um,
     map_cells,
     parse_corrected_matrix,
     preprocess_sources,
-    resolve_smiles,
     resolve_pubchem_cid,
-    build_drug_features,
+    resolve_smiles,
+    response_quality_control,
 )
 
 
@@ -264,20 +268,68 @@ def test_duplicate_cosmic_mappings_fail(raw_dataset: Path) -> None:
         map_cells(raw_dataset)
 
 
-def test_out_of_range_response_is_not_clipped(raw_dataset: Path) -> None:
+def test_response_outside_unit_interval_but_inside_quality_range_is_not_clipped(
+    raw_dataset: Path,
+) -> None:
     write_matrix(
         raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx",
         response=130,
     )
     destination = raw_dataset / "processed/out_of_range"
     manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
-    assert manifest["counts"]["out_of_range_response_observations"] == 1
+    assert manifest["counts"]["retained_observations_outside_unit_interval"] == 1
     assert pd.read_parquet(destination / "observations.parquet").inhibition.min() == pytest.approx(
         -0.3
     )
     assert json.loads((destination / "source_manifest.json").read_text())["config"][
         "include_zero_doses"
     ]
+
+
+@pytest.mark.parametrize(
+    ("response", "expected_inhibition"),
+    [(300.0, INHIBITION_QUALITY_MIN), (-100.0, INHIBITION_QUALITY_MAX)],
+)
+def test_inhibition_quality_boundaries_are_inclusive(
+    raw_dataset: Path, response: float, expected_inhibition: float
+) -> None:
+    path = raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx"
+    write_matrix(path, response=response)
+    destination = raw_dataset / "processed/quality_boundary"
+    manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
+    observations = pd.read_parquet(destination / "observations.parquet")
+
+    assert any(value == pytest.approx(expected_inhibition) for value in observations.inhibition)
+    assert manifest["response_quality_control"] == response_quality_control()
+    assert manifest["counts"]["quality_control_excluded_observations"] == 0
+
+
+@pytest.mark.parametrize(
+    ("response", "expected_inhibition"),
+    [(301.0, -2.01), (-101.0, 2.01)],
+)
+def test_inhibition_outside_quality_range_is_removed_and_preserved(
+    raw_dataset: Path, response: float, expected_inhibition: float
+) -> None:
+    path = raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx"
+    write_matrix(path, response=response)
+    destination = raw_dataset / "processed/quality_exclusion"
+    manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
+    observations = pd.read_parquet(destination / "observations.parquet")
+    exclusions = pd.read_parquet(destination / "exclusions.parquet")
+    quality = exclusions.loc[exclusions.reason.eq(INHIBITION_QUALITY_REASON)]
+
+    assert len(observations) == 3
+    assert observations.inhibition.between(
+        INHIBITION_QUALITY_MIN, INHIBITION_QUALITY_MAX, inclusive="both"
+    ).all()
+    assert len(quality) == 1
+    assert quality.iloc[0].response_percent == pytest.approx(response)
+    assert quality.iloc[0].inhibition == pytest.approx(expected_inhibition)
+    assert "without clipping" in quality.iloc[0].detail
+    assert manifest["exclusion_schema"][-2:] == ["response_percent", "inhibition"]
+    assert manifest["counts"]["quality_control_excluded_observations"] == 1
+    assert manifest["counts"]["excluded_by_reason"][INHIBITION_QUALITY_REASON] == 1
 
 
 def test_pubchem_exact_cid_cache_is_verified_and_offline(

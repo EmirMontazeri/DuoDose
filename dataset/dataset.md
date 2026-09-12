@@ -15,6 +15,13 @@ identity components before VAE preprocessing, training, or internal selection.
 The response validation/test expression vectors are transformed only with state
 fitted on VAE-training models.
 
+Dose-response source preprocessing computes
+`inhibition = 1 - response_percent / 100` and, before constructing any dataset
+split, retains only observations in the inclusive range `[-2.0, 2.0]`. Values
+outside that range are removed without clipping. Their original response and
+computed inhibition remain in the processed `exclusions.parquet` table with
+reason `response_outside_quality_range` and source matrix/grid provenance.
+
 ## Sources
 
 - **AstraZeneca-Sanger DREAM Challenge:** downloaded from Synapse, project `syn4231880`.

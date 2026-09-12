@@ -19,6 +19,7 @@ from reverse_dose.data import (
     extract_expression,
     prepare_dataset,
 )
+from reverse_dose.preprocess import response_quality_control
 
 
 def _refresh_manifest(directory: Path, manifest: str, key: str) -> None:
@@ -27,7 +28,12 @@ def _refresh_manifest(directory: Path, manifest: str, key: str) -> None:
         for path in sorted(directory.iterdir())
         if path.name != manifest
     }
-    (directory / manifest).write_text(json.dumps({key: hashes}, sort_keys=True) + "\n")
+    manifest_path = directory / manifest
+    values = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+    values[key] = hashes
+    if manifest == "source_manifest.json":
+        values.setdefault("response_quality_control", response_quality_control())
+    manifest_path.write_text(json.dumps(values, sort_keys=True) + "\n")
 
 
 def _synthetic_sources(tmp_path: Path) -> tuple[Path, Path]:
@@ -389,4 +395,7 @@ def test_preparation_rejects_tampered_source_before_fitting(tmp_path: Path) -> N
     rows.loc[0, "inhibition"] = 7.0
     rows.to_parquet(source / "observations.parquet", index=False)
     with pytest.raises(ValueError, match="Source artifact integrity mismatch"):
+        prepare_dataset(source, expression, tmp_path / "prepared", {}, {})
+    _refresh_manifest(source, "source_manifest.json", "output_hashes")
+    with pytest.raises(ValueError, match="inclusive quality range"):
         prepare_dataset(source, expression, tmp_path / "prepared", {}, {})

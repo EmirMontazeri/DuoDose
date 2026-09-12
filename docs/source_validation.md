@@ -1,7 +1,7 @@
 # Complete source validation
 
 Both corrected-matrix releases were fully parsed with source schema
-`source-v2.3`; validation was not limited to the original audit's sampled files.
+`source-v2.4`; validation was not limited to the original audit's sampled files.
 The runs used the default source policies, exact released PubChem identifier
 resolution, zero-dose inclusion, and no configured cell aliases. DREAM and OI
 were processed independently. These are ingestion results, not trained-model
@@ -13,22 +13,23 @@ performance measurements.
 | ----------------------------------------------------------------- | ------: | ------: |
 | Corrected XLSX matrices parsed                                    |  11,608 |  20,489 |
 | Matrices with retained measurements                               |   9,931 |  11,185 |
-| Retained dose-response observations                               | 357,516 | 402,660 |
+| Retained dose-response observations                               | 357,462 | 402,427 |
 | DREAM metadata cells mapped by exact COSMIC ID                    |      85 |      85 |
 | Cells represented in retained observations                        |      80 |      80 |
 | Drugs represented in retained observations                        |     110 |     110 |
 | Released agents with supported fingerprints                       |     112 |     112 |
-| Out-of-range inhibition observations retained without clipping    |  49,699 |  69,347 |
+| Quality outliers removed before splitting                         |      54 |     233 |
+| Retained observations outside biological interval `[0,1]`         |  49,645 |  69,114 |
 | Workbooks with incorrect `A1` declared dimensions read completely |  11,608 |  20,489 |
 
 The default DREAM artifacts are in
-`dataset/processed/dose_response/v2_078e19571307/`, with identity
-`ccf66cca1db94bd9a736a74fa59243cb2dbf78979c8c3f993c2ffd23819583b6`.
+`dataset/processed/dose_response/v2_2a3cd80276be/`, with identity
+`e44354cd782a96b7113f52d4c029a86ce5bedda898b73ff5e11bef0339260d24`.
 The separately configured OI artifacts are generated in
-`dataset/processed/dose_response/v2_034dfcf575e3/`. The full OI validation
-above completed during implementation; regenerate those optional artifacts
-with the command below if they are absent. Exact source identities are
-recorded in each generated manifest and include cached CID retrieval provenance.
+`dataset/processed/dose_response/v2_18a34f622cc1/`, with identity
+`776999b0ac164291b6431cec65226979972ee4c63fcd0516002cda1af7df8eb2`.
+Exact source identities are recorded in each generated manifest and include
+cached CID retrieval provenance.
 These paths are computed from the source configuration and schema version; use
 the CLI to obtain the correct path after changing a source policy.
 
@@ -51,12 +52,17 @@ Standalone preparation writes persistent logs to
 | Conflicting filename/internal cell label, per matrix |        615 |     966 |
 | Missing response, per grid point                     |          0 |     252 |
 | Entire grid has no measured responses, per matrix    |          0 |       7 |
+| Inhibition outside inclusive `[-2.0,2.0]`, per point |         54 |     233 |
 
 Reasons overlap: one matrix may have an unsupported drug and an unresolved cell,
 or both an unresolved label and a label mismatch. Consequently, summing reason
 counts does not give the number of distinct excluded matrices. Every reason is
 recorded with its source filename in `exclusions.parquet`; point exclusions also
-carry the original worksheet coordinates.
+carry the original worksheet coordinates. Rows excluded by inhibition quality
+control additionally retain the original `response_percent` and the unmodified
+computed `inhibition`. The retained inhibition range is `[-2.0,1.873]` in both
+cohorts; excluded ranges are `[-2.505,41.965]` for DREAM and
+`[-6.629,44.513]` for OI.
 
 The complete DREAM cell-label discrepancies are:
 
@@ -161,16 +167,16 @@ outputs. Generation timestamps are excluded from the scientific manifest so
 identical source/cache/code/config inputs regenerate identical manifest bytes.
 PubChem retrieval timestamps remain in the immutable cached retrieval provenance.
 
-During implementation, the v2.3 DREAM rebuild was compared against the preceding
-source implementation. All five derived data files had identical bytes and SHA256
-values. The response-table SHA256 is
-`c89cfec1f44b8628f1dadf240f774ad887848f7216e262b5dcf5c70ed5d51761`.
-The schema change affected missing-grid handling and provenance integrity without
-changing DREAM observation tensors. The current trained runs were subsequently
-regenerated and now reference the current implementation and artifact identities.
+Source schema v2.4 makes the inclusive bounds, remove-without-clipping action,
+exclusion reason and pre-split execution stage part of the hashed source identity.
+It also records the observation and exclusion schemas, exact reason counts, raw
+excluded responses and computed inhibitions. Downstream preparation verifies both
+the declared policy and every retained inhibition value before assigning a split;
+a pre-v2.4 or internally inconsistent source artifact is rejected.
 
-The preprocessing test module passes 28 tests covering axis/drug orientation,
+The preprocessing test module covers axis/drug orientation,
 units, malformed and missing numeric values, completely empty OI responses,
 aliases, immutable raw data, exact CID validation, offline cache reuse,
-manifest/output corruption, exclusions and byte-identical regeneration. Ruff
-passes for the preprocessing module and its tests.
+manifest/output corruption, inclusive quality boundaries, raw-value-preserving
+quality exclusions, exclusions and byte-identical regeneration. Ruff passes for
+the preprocessing module and its tests.

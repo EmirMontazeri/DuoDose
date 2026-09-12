@@ -3,7 +3,8 @@
 Corrected matrices supply measured grid points, without interpolation or replicate
 averaging. Internal Agent1 is the row axis and Agent2 the column axis; canonical
 drug ordering always moves the corresponding dose. Responses are percent control
-viability, with inhibition = 1 - response / 100, including out-of-range values.
+viability, with inhibition = 1 - response / 100. Values outside the inclusive
+inhibition quality range [-2, 2] are preserved in exclusions rather than clipped.
 
 No fitted statistics occur here. Cell/drug mappings, exclusions, source hashes,
 and feature definitions are recorded before downstream split-specific fitting.
@@ -38,7 +39,10 @@ from rdkit import Chem, DataStructs, rdBase
 from rdkit.Chem import rdFingerprintGenerator
 
 LOGGER = logging.getLogger(__name__)
-SCHEMA_VERSION = "source-v2.3"
+SCHEMA_VERSION = "source-v2.4"
+INHIBITION_QUALITY_MIN = -2.0
+INHIBITION_QUALITY_MAX = 2.0
+INHIBITION_QUALITY_REASON = "response_outside_quality_range"
 CHEMISTRY_COLUMN = "SMILES or PubChem ID"
 SOURCE_DIRECTORIES = {
     "dream": "raw/az_dream/DREAM_Challenge_matrices_corrected",
@@ -82,6 +86,8 @@ EXCLUSION_COLUMNS = [
     "detail",
     "grid_row",
     "grid_col",
+    "response_percent",
+    "inhibition",
 ]
 DEFAULTS: dict[str, Any] = {
     "sources": ["dream"],
@@ -98,6 +104,19 @@ DEFAULTS: dict[str, Any] = {
     "pubchem_timeout_seconds": 30,
     "pubchem_retries": 3,
 }
+
+
+def response_quality_control() -> dict[str, Any]:
+    """Return the fixed, manifest-safe response quality-control specification."""
+    return {
+        "field": "inhibition",
+        "minimum": INHIBITION_QUALITY_MIN,
+        "maximum": INHIBITION_QUALITY_MAX,
+        "bounds": "inclusive",
+        "action": "exclude_without_clipping",
+        "reason": INHIBITION_QUALITY_REASON,
+        "stage": "source preprocessing before dataset splitting",
+    }
 
 
 def _hash_file(path: Path) -> str:
@@ -814,6 +833,7 @@ def preprocess_sources(
     identity = {
         "schema_version": SCHEMA_VERSION,
         "config": effective,
+        "response_quality_control": response_quality_control(),
         "raw_files": raw_files,
         "resolved_chemistry_files": resolved_chemistry_files,
         "source_inventory": source_counts,
@@ -989,6 +1009,26 @@ def preprocess_sources(
                         matrix["dose1_um"][row - 1],
                         matrix["dose2_um"][column - 1],
                     )
+                    inhibition = 1.0 - response / 100.0
+                    if not INHIBITION_QUALITY_MIN <= inhibition <= INHIBITION_QUALITY_MAX:
+                        exclusions.append(
+                            dict(
+                                source=source,
+                                source_file=relative,
+                                matrix_id=matrix_id,
+                                reason=INHIBITION_QUALITY_REASON,
+                                detail=(
+                                    "Computed inhibition is outside inclusive quality range "
+                                    f"[{INHIBITION_QUALITY_MIN}, {INHIBITION_QUALITY_MAX}]; "
+                                    "raw response retained without clipping"
+                                ),
+                                grid_row=row,
+                                grid_col=column,
+                                response_percent=response,
+                                inhibition=inhibition,
+                            )
+                        )
+                        continue
                     if not effective["include_zero_doses"] and (dose1 == 0 or dose2 == 0):
                         exclusions.append(
                             dict(
@@ -1015,7 +1055,7 @@ def preprocess_sources(
                             drug_b=drug_b,
                             dose_a_um=dose_a,
                             dose_b_um=dose_b,
-                            inhibition=1.0 - response / 100.0,
+                            inhibition=inhibition,
                             response_percent=response,
                             grid_row=row,
                             grid_col=column,
@@ -1052,8 +1092,12 @@ def preprocess_sources(
         "identity_hash": identity_hash,
         "cell_mapping": cell_provenance,
         "observation_schema": OBSERVATION_COLUMNS,
+        "exclusion_schema": EXCLUSION_COLUMNS,
         "drug_alias_evidence": drug_alias_evidence,
-        "response_definition": "inhibition = 1 - percent_control_viability / 100; no clipping",
+        "response_definition": (
+            "inhibition = 1 - percent_control_viability / 100; no clipping; "
+            "retain only inclusive quality range [-2.0, 2.0]"
+        ),
         "response_source_evidence": "raw/az_dream/Combenefit_dose_response_fitting_code.txt fixes EC0=100.0",
         "dose_unit": "uM",
         "dose_order": "case-sensitive lexicographic canonical drug IDs; doses moved together",
@@ -1079,7 +1123,10 @@ def preprocess_sources(
             ),
             "incorrect_declared_dimensions_read_completely": malformed_dimensions,
             "excluded_by_reason": dict(sorted(Counter(exclusion_frame["reason"]).items())),
-            "out_of_range_response_observations": int(
+            "quality_control_excluded_observations": int(
+                (exclusion_frame["reason"] == INHIBITION_QUALITY_REASON).sum()
+            ),
+            "retained_observations_outside_unit_interval": int(
                 (
                     (observation_frame["inhibition"] < 0) | (observation_frame["inhibition"] > 1)
                 ).sum()

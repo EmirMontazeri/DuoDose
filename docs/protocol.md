@@ -41,11 +41,17 @@ I = 1 - V/100,
 \]
 
 where \(V\) is measured percent-control viability and \(I\) is inhibition in
-fraction units. Responses outside 0–100% are retained without clipping. Missing
-response points are excluded and counted under the configured policy; unsupported
-units or malformed required data fail clearly. Declared grid dimensions that
-disagree with a valid populated rectangular grid are handled using the actual
-complete grid and recorded explicitly in source metadata.
+fraction units. Source preprocessing retains an observation only when
+\(-2.0 \le I \le 2.0\), with inclusive boundaries. Values outside that quality
+range are removed—not clipped—before dataset splitting and recorded in
+`exclusions.parquet` with reason `response_outside_quality_range`, original
+`response_percent`, unmodified computed `inhibition`, source file, matrix and grid
+coordinates. Responses outside 0–100% remain valid when their inhibition is still
+inside the quality range. Missing response points are excluded and counted under
+the configured policy; unsupported units or malformed required data fail clearly.
+Declared grid dimensions that disagree with a valid populated rectangular grid
+are handled using the actual complete grid and recorded explicitly in source
+metadata.
 
 Every measured grid point yields one conditional-density observation:
 
@@ -57,7 +63,9 @@ All observed alternatives and replicate measurements remain separate. The defaul
 includes monotherapy axes and zero-dose controls; `include_zero_doses: false`
 restricts the population to points with both doses positive. There is no inferred
 isobole, nearest-response label, interpolated dose coordinate, response clipping or
-averaging of response replicates. Consequently the model estimates the dose
+averaging of response replicates. The fixed response-quality policy and its
+inclusive bounds, action, reason and execution stage are part of the versioned
+source manifest and source identity. Consequently the model estimates the dose
 distribution under this experimental sampling scheme. It does not establish
 that all points with high predicted density achieve an arbitrary requested
 inhibition between measured observations.

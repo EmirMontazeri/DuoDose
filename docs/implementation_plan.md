@@ -36,7 +36,11 @@ or forward-response model will be invented.
   source file, experiment, source row/column, raw response and labels.
 - The supplied Hill-fitting code fixes the zero-dose response at 100. Interpret
   matrix values as percent control viability and use `inhibition=1-response/100`.
-  Preserve out-of-range experimental responses without clipping.
+  Before any split, keep only the inclusive inhibition range `[-2.0, 2.0]`.
+  Remove rather than clip values outside it, preserving their raw response and
+  computed inhibition in the exclusion table under
+  `response_outside_quality_range`. Preserve nonphysical responses within the
+  quality range without clipping.
 - Each measured grid point supplies its observed inhibition input and dose target.
   Keep all measured alternatives and replicates; do not interpolate isoboles or
   collapse multiple solutions. Include zero-dose controls and monotherapies;

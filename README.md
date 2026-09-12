@@ -49,6 +49,13 @@ validation/test-only identity groups from the complete offline VAE population,
 then splits every remaining profile between VAE training and internal validation.
 Only VAE-training profiles fit gene selection, imputation and scaling.
 
+Before those splits, source preprocessing computes inhibition from the released
+percent-control response and keeps only the inclusive range `[-2.0, 2.0]`.
+Outliers are removed, never clipped, and written to `exclusions.parquet` with
+reason `response_outside_quality_range`, their original response, computed
+inhibition, source matrix and grid coordinates. The fixed policy is recorded in
+and hashed by source schema `source-v2.4`.
+
 The supplied chemistry includes 42 numeric PubChem identifiers requiring exact
 CID resolution. With `sources.resolve_pubchem: true`, the first preparation
 retrieves structures for those released identifiers and preserves the response
@@ -65,7 +72,7 @@ than silently reducing the selected cohort.
 First perform the short real-source integration check:
 
 ```bash
-uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-expanded-vae
+uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-qc-expanded-vae
 ```
 
 The smoke configuration uses 240 systematically selected matrices, small feature
@@ -75,7 +82,7 @@ artifact generation; they are not scientific performance estimates.
 Train the complete default baseline with:
 
 ```bash
-uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-expanded-vae
+uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae
 ```
 
 `run` prepares the source tables and expression, constructs grouped splits and
@@ -88,8 +95,8 @@ norms and checkpoints are visible in the terminal and persistent logs.
 Resume a run created with the current schema without changing its settings:
 
 ```bash
-uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-expanded-vae --resume
-uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-expanded-vae --resume
+uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-qc-expanded-vae --resume
+uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae --resume
 ```
 
 SIGINT/SIGTERM requests checkpoint creation after the active minibatch completes.
@@ -100,7 +107,8 @@ as a different experiment. Start a new output directory for changed experiments.
 
 The included `runs/smoke`, `runs/v2` and `runs/suite` artifacts use the earlier
 85-model expression extraction and intentionally fail current continuation
-identity checks. Choose a fresh run directory for the expanded-VAE pipeline.
+identity checks. Use fresh run directories for the expanded-VAE quality-controlled
+pipeline.
 
 ## Execute stages separately
 
@@ -205,7 +213,7 @@ from the cell-disjoint cold-start baseline.
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `dataset/raw/`                                | Immutable downloaded sources                                                                          |
 | `dataset/processed/dose_response/v2_*/`       | Observations, canonical cell mapping, chemistry features, exclusions and source manifest              |
-| `dataset/processed/cell_expression/v2/`       | Raw TPM means, gene/model IDs, measurement counts and extraction provenance                           |
+| `dataset/processed/cell_expression/v2_*/`     | Raw TPM means, gene/model IDs, measurement counts and extraction provenance                           |
 | `dataset/processed/drug_features/pubchem/v1/` | Immutable exact-CID response cache and provenance                                                     |
 | `dataset/splits/v2_*/`                        | Split memberships, portable feature arrays, fitted transforms and artifact hashes                     |
 | `dataset/manifests/v2_logs/`                  | Standalone preprocessing logs                                                                         |
@@ -219,7 +227,7 @@ small-molecule structures are `ADAM17`, `CD19`, `PDGFR_Ab`, `TNFSF10`, `ATR_3`,
 are quarantined unless an explicit evidence-bearing alias is configured. The
 released `Gemcitibine` synonym is resolved to `Gemcitabine` with its metadata
 evidence. Inspect each source manifest and `exclusions.parquet` for the actual
-retained population and source-specific issues.
+retained population, response-quality exclusions and source-specific issues.
 
 The package is organized into `preprocess.py` (source ingestion), `data.py`
 (expression/splits/transforms), `models.py` (architecture and densities),

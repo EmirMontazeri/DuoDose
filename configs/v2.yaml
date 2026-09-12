@@ -5,6 +5,7 @@ device: cpu
 deterministic: true
 threads: 4
 sources:
+  # Fixed source-v2.4 QC removes, without clipping, inhibition outside [-2, 2].
   sources: [dream]
   fingerprint_bits: 2048
   fingerprint_radius: 2

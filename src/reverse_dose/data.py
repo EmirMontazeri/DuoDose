@@ -27,6 +27,12 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from .preprocess import (
+    INHIBITION_QUALITY_MAX,
+    INHIBITION_QUALITY_MIN,
+    response_quality_control,
+)
+
 LOGGER = logging.getLogger(__name__)
 SCHEMA_VERSION = 2
 EXPRESSION_POPULATION = "all CMP models with Broad or Sanger cell-line RNA-seq"
@@ -773,6 +779,10 @@ def prepare_dataset(
     expression_files = ["expression.npz", "expression_manifest.json"]
     source_manifest = json.loads((source_dir / "source_manifest.json").read_text())
     expression_manifest = json.loads((expression_dir / "expression_manifest.json").read_text())
+    if source_manifest.get("response_quality_control") != response_quality_control():
+        raise ValueError(
+            "Source manifest lacks the required pre-split inhibition quality-control policy"
+        )
     source_hashes = source_manifest.get("output_hashes", {})
     expression_hashes = expression_manifest.get("artifacts", {})
     if (
@@ -848,8 +858,17 @@ def prepare_dataset(
             raise ValueError(f"Observations contain missing {column}")
         rows[column] = rows[column].astype(str)
     numeric = rows[["dose_a_um", "dose_b_um", "inhibition"]].to_numpy(dtype=np.float64)
-    if not len(rows) or not np.isfinite(numeric).all() or (numeric[:, :2] < 0).any():
-        raise ValueError("Observations must have finite inhibition and nonnegative finite doses")
+    if (
+        not len(rows)
+        or not np.isfinite(numeric).all()
+        or (numeric[:, :2] < 0).any()
+        or (numeric[:, 2] < INHIBITION_QUALITY_MIN).any()
+        or (numeric[:, 2] > INHIBITION_QUALITY_MAX).any()
+    ):
+        raise ValueError(
+            "Observations must have finite nonnegative doses and inhibition in inclusive "
+            f"quality range [{INHIBITION_QUALITY_MIN}, {INHIBITION_QUALITY_MAX}]"
+        )
     unknown_cells = set(rows.cell_id) - set(cells.cell_id)
     if unknown_cells:
         raise ValueError(f"Response cells have no validated model mapping: {sorted(unknown_cells)}")
@@ -1053,7 +1072,11 @@ def prepare_dataset(
             "excluded_genes": "zero variance or wholly unobserved among VAE-training models",
             "dose_fit_rows": "train",
             "dose_transform": dose_transform.to_dict(),
-            "inhibition_definition": "1 - percent_control_viability / 100; no clipping",
+            "inhibition_definition": (
+                "1 - percent_control_viability / 100; no clipping; retain only inclusive "
+                f"quality range [{INHIBITION_QUALITY_MIN}, {INHIBITION_QUALITY_MAX}]"
+            ),
+            "response_quality_control": response_quality_control(),
         },
         "n_cells": len(cell_ids),
         "n_drugs": len(drug_ids),
@@ -1166,6 +1189,15 @@ class DataBundle:
             raise ValueError(
                 "Prepared dataset must contain precisely train, validation and test splits"
             )
+        inhibition = self.observations["inhibition"].to_numpy(dtype=np.float64)
+        if (
+            not np.isfinite(inhibition).all()
+            or (inhibition < INHIBITION_QUALITY_MIN).any()
+            or (inhibition > INHIBITION_QUALITY_MAX).any()
+            or self.manifest["features"].get("response_quality_control")
+            != response_quality_control()
+        ):
+            raise ValueError("Prepared dataset violates inhibition quality control")
         if set(self.vae_train_indices) & set(self.vae_validation_indices):
             raise ValueError("VAE training and validation models overlap")
         if (

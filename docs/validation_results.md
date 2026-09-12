@@ -143,9 +143,9 @@ The historical smoke bundle is `dataset/splits/v2_02710809f6d5`, fingerprint
 The historical full bundle is `dataset/splits/v2_477d7b35d901`. Both runs
 were regenerated using the final code, including source schema `source-v2.3`.
 
-## Expanded-VAE pipeline verification
+## Pre-QC expanded-VAE pipeline verification
 
-On 2026-09-12, full preparation under data schema 2 produced
+Earlier on 2026-09-12, full preparation under data schema 2 produced
 `dataset/splits/v2_f36085a4152b`, fingerprint
 `68afd06a9a93634e8419b1e81e40da079a3f1db1f49ca1522f8e88c32accc36b`.
 The expression source contains all 1,643 catalogued Broad/Sanger cell-line
@@ -164,8 +164,36 @@ offline VAE and frozen-encoder final stage both completed; validation NLL was
 deliberately skipped, so this run verifies integration and does not report or
 use test performance.
 
+These artifacts predate inhibition quality control and are retained only as an
+integration record. They must not be resumed or reported as results of the
+current source schema.
+
+## Current inhibition-QC pipeline verification
+
+Source schema `source-v2.4` applies the fixed inclusive inhibition range
+`[-2.0,2.0]` before splitting. The complete DREAM rebuild removed 54 of 357,516
+otherwise eligible observations and retained 357,462. Every removed row is in
+`dataset/processed/dose_response/v2_2a3cd80276be/exclusions.parquet` under
+`response_outside_quality_range`, with its original response and unmodified
+computed inhibition. Retained inhibition spans `[-2.0,1.873]`; the removed values
+span `[-2.505,41.965]`.
+
+The current full prepared bundle is `dataset/splits/v2_6fb47dab2bd0`, fingerprint
+`d858bc8152c49bed3e4049f2fcb5230abcb1e1e7ec4a79d50db86da047eae7e2`.
+Because QC precedes grouped allocation, its 357,462 observations split into
+244,008 training, 54,306 validation and 59,148 test rows. The VAE population
+remains 1,379 training, 239 internal-validation and 25 final-evaluation-identity
+excluded profiles.
+
+The current two-epoch integration run is `runs/smoke-qc-expanded-vae`, using
+prepared bundle `dataset/splits/v2_220e77d01e9a`, fingerprint
+`593f9030d9b9be3ec9cf112eedea1390ab09e24189d582c21a8195145b00dbf0`.
+Its systematic 240-matrix subset contained no inhibition beyond the quality
+range, so its 7,524 rows and validation NLL `1.777403712` are unchanged. Test
+evaluation was deliberately skipped.
+
 The historical recorded check passed 93 tests. The expanded-VAE implementation
-currently passes 96 tests and Ruff checks.
+with inhibition quality control currently passes 100 tests and Ruff checks.
 Relevant checks include:
 
 - Source parsing, concentration units, identifier provenance, source
@@ -206,8 +234,8 @@ schema remains `source-v2.3`.
 Reproduce the current expanded-VAE protocol in fresh directories:
 
 ```bash
-uv run --frozen reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-expanded-vae
-uv run --frozen reverse-dose run --config configs/v2.yaml --run-dir runs/v2-expanded-vae
+uv run --frozen reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-qc-expanded-vae
+uv run --frozen reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae
 ```
 
 To reproduce the declared protocol as a new experiment, choose a new run
