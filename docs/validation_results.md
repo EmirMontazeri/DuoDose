@@ -192,8 +192,72 @@ Its systematic 240-matrix subset contained no inhibition beyond the quality
 range, so its 7,524 rows and validation NLL `1.777403712` are unchanged. Test
 evaluation was deliberately skipped.
 
+## Final-MDN divergence diagnosis and correction
+
+The first complete inhibition-QC final-stage run, `runs/v2-qc-expanded-vae`,
+used zero weight decay. Its training NLL improved monotonically from `0.613911`
+at epoch 1 to `-1.137092` at epoch 16, while cell-cold validation NLL worsened
+from its selected epoch-1 value `0.692665` to `10.515211`. This was not an
+indexing, split-overlap, or exploding-loss failure. The prepared split contains
+244,008 training rows, but only 56 independent training cell identities for
+408,318 trainable final-stage parameters; the measurements are repeated dose
+grids rather than independent evidence for unseen-cell behavior.
+
+Checkpoint diagnostics identify conditional-density memorization and covariance
+collapse. The held-out mixture-mean RMSE changed little between epoch 1 and 16
+(`0.710` to `0.703` when averaged per row), but the winning component's 1st
+percentile scale contracted from `0.01620` to `0.000699` standardized log-dose
+units. Mean covariance log determinant fell from `-6.061` to `-10.032`.
+Accordingly, validation NLL's 99th percentile rose from `7.540` to `123.585`
+and its maximum from `54.856` to `4,930.050`. This is the signature of an
+overfit Gaussian-mixture likelihood: training observations receive extremely
+narrow components, while small errors on unseen cells incur enormous density
+penalties.
+
+Only the final-stage training subset and validation split were used to diagnose
+and choose the correction. Controlled ablations retained the proposal's model,
+five-component correlated Gaussian MDN, exact NLL, frozen VAE, data, seed, and
+cell-cold split:
+
+| Final-stage change | Best validation NLL | Epoch-16 validation NLL |
+| ------------------ | ------------------: | ----------------------: |
+| Original: no weight decay, floor `1e-4` | `0.692665` | `10.515211` |
+| Scale floor `0.05` only | `0.712733` | `20.068740` |
+| Weight decay `1e-3` + floor `0.05` | `0.699000` | `2.918432` |
+| LR `1e-4`, weight decay `1e-3`, floor `0.05` | `0.779359` | `0.837571` |
+| Weight decay `1e-3`, original floor `1e-4` | **`0.556188`** | `0.647186` |
+
+The table shows that a floor alone does not cure memorization and that final-stage
+L2 weight decay is the effective intervention. A subsequent validation-only
+check of floor `0.005` reached `0.583723`, so the original `1e-4` numerical floor
+was retained. The production configuration now applies weight decay `1e-3`,
+keeps offline-VAE weight decay at zero, records scale/covariance diagnostics, and
+stops after eight non-improving epochs. Shorter patience cannot change selected
+weights; it prevents unnecessary post-optimum drift.
+
+The corrected run is `runs/v2-qc-expanded-vae-regularized`. It selected epoch 5
+and stopped at epoch 13. After the configuration and checkpoint were frozen, the
+test split was evaluated exactly once; it had no role in preprocessing, fitting,
+scheduling, stopping, hyperparameter choice, or checkpoint selection.
+
+| Metric | Original validation | Corrected validation | Original test | Corrected test |
+| ------ | ------------------: | -------------------: | ------------: | -------------: |
+| Overall NLL | `0.692665` | **`0.556188`** | `0.610157` | **`0.545532`** |
+| Macro-cell NLL | `0.599102` | **`0.433598`** | `0.682887` | **`0.651831`** |
+| Coordinate MAE, scaled | `0.620998` | `0.619184` | `0.610372` | `0.605519` |
+| Coordinate MAE, µM | `0.445226` | `0.445713` | `0.427178` | `0.425858` |
+
+Thus validation NLL improved by 19.7%, final test NLL by 10.6%, and the corrected
+epoch-13 validation NLL is 94.3% below the original epoch-16 failure. This is a
+density-calibration/generalization improvement, not a broad point-prediction
+gain. Limitations remain visible: corrected test near-50%-inhibition NLL worsened
+from `1.464756` to `1.992169`, and the invalid mixture-mean point fraction rose
+from 1.36% to 6.42%. The primary predeclared overall NLL improved, but these
+subgroup and physical-support regressions preclude claiming uniform improvement.
+
 The historical recorded check passed 93 tests. The expanded-VAE implementation
-with inhibition quality control currently passes 100 tests and Ruff checks.
+with inhibition quality control and MDN diagnostics currently passes 101 tests
+and Ruff checks.
 Relevant checks include:
 
 - Source parsing, concentration units, identifier provenance, source
@@ -217,9 +281,9 @@ Relevant checks include:
 These checks establish software behavior and recorded experiment continuity.
 They do not establish biological validity, target-achievement calibration,
 clinical utility, or robustness to all unseen cells and experimental conditions.
-The final MDN remains unrestricted: for the full test run its direct
-model-order diagnostic gives mean coordinate disagreement 0.028822631 in
-standardized units and mean absolute log-density disagreement 0.630231440.
+The final MDN remains unrestricted: for the corrected full test run its direct
+model-order diagnostic gives mean coordinate disagreement 0.0126466397 in
+standardized units and mean absolute log-density disagreement 0.2974779904.
 The public predictor instead canonicalizes input order and restores caller
 axes explicitly; this API convention does not alter the specified network.
 
@@ -235,7 +299,7 @@ Reproduce the current expanded-VAE protocol in fresh directories:
 
 ```bash
 uv run --frozen reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-qc-expanded-vae
-uv run --frozen reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae
+uv run --frozen reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae-regularized
 ```
 
 To reproduce the declared protocol as a new experiment, choose a new run

@@ -110,7 +110,23 @@ def _loss(
             reconstruction, mean, logvar = model(batch)
         return vae_loss(reconstruction, batch, mean, logvar, beta=beta)
     parameters = model(batch["cell"], batch["inhibition"], batch["drug_a"], batch["drug_b"])
-    return {"loss": mixture_nll(parameters, batch["target"])}
+    weights = parameters.weights
+    # These metrics do not alter the proposal's exact MDN NLL objective. They
+    # expose the characteristic signature of conditional Gaussian collapse:
+    # improving train NLL accompanied by shrinking covariance volume and poor
+    # held-out NLL. Means are batch-additive, so epoch aggregation is exact.
+    covariance_log_determinant = (
+        2 * parameters.scales.log().sum(dim=-1)
+        + ((1 - parameters.correlations) * (1 + parameters.correlations)).log()
+    )
+    point_rmse = (parameters.mixture_mean - batch["target"]).square().mean(dim=-1).sqrt()
+    return {
+        "loss": mixture_nll(parameters, batch["target"]),
+        "mean_log_scale": parameters.scales.log().mean(),
+        "mean_covariance_log_determinant": covariance_log_determinant.mean(),
+        "mean_mixture_entropy": -(weights * weights.clamp_min(1e-30).log()).sum(-1).mean(),
+        "mixture_mean_rmse": point_rmse.mean(),
+    }
 
 
 @torch.no_grad()
@@ -485,6 +501,22 @@ def train_stage(
                 state["best_validation"],
                 " selected" if improved else "",
             )
+            diagnostic_keys = {
+                "mean_log_scale",
+                "mean_covariance_log_determinant",
+                "mixture_mean_rmse",
+            }
+            if stage == "model" and diagnostic_keys <= validation.keys():
+                LOGGER.info(
+                    "model covariance diagnostics: train log_scale=%.6f log_det=%.6f "
+                    "rmse=%.6f; validation log_scale=%.6f log_det=%.6f rmse=%.6f",
+                    training["mean_log_scale"],
+                    training["mean_covariance_log_determinant"],
+                    training["mixture_mean_rmse"],
+                    validation["mean_log_scale"],
+                    validation["mean_covariance_log_determinant"],
+                    validation["mixture_mean_rmse"],
+                )
             event(
                 log_path,
                 {

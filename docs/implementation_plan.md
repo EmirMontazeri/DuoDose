@@ -79,7 +79,10 @@ or forward-response model will be invented.
   metadata enter VAE fitting, internal selection or preprocessing.
 - Offline objective: summed Gaussian reconstruction squared error (one-half)
   plus analytic diagonal-Gaussian KL to N(0,I), averaged over cells. Final objective:
-  exact stable correlated bivariate mixture negative log likelihood (NLL).
+  exact stable correlated bivariate mixture negative log likelihood (NLL). Use
+  final-stage L2 weight decay `1e-3`, selected on validation only, to regularize
+  the many repeated dose-grid observations against the much smaller number of
+  independent training cell identities; leave offline-VAE weight decay at zero.
 - Select offline and final checkpoints by their own validation objectives.
   Report test NLL, coordinate errors for the mixture-mean point summary, errors
   in original units, per-cell/pair/response-range summaries, near-50% observed

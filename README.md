@@ -82,7 +82,7 @@ artifact generation; they are not scientific performance estimates.
 Train the complete default baseline with:
 
 ```bash
-uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae
+uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae-regularized
 ```
 
 `run` prepares the source tables and expression, constructs grouped splits and
@@ -90,13 +90,16 @@ fitted transforms, trains the offline VAE, freezes its selected encoder, trains
 the final model, and evaluates its selected checkpoint on validation and test
 data. Use `--skip-test` to defer test evaluation while developing an experiment.
 The full run may be long; progress, validation scores, learning rates, gradient
-norms and checkpoints are visible in the terminal and persistent logs.
+norms, MDN covariance diagnostics and checkpoints are visible in the terminal
+and persistent structured event logs. The full configuration regularizes only
+the final stage with L2 weight decay `1e-3`; this setting was selected without
+test access to prevent memorization and covariance collapse on cell-cold splits.
 
 Resume a run created with the current schema without changing its settings:
 
 ```bash
 uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/smoke-qc-expanded-vae --resume
-uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae --resume
+uv run reverse-dose run --config configs/v2.yaml --run-dir runs/v2-qc-expanded-vae-regularized --resume
 ```
 
 SIGINT/SIGTERM requests checkpoint creation after the active minibatch completes.

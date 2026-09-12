@@ -274,10 +274,15 @@ distinct quantities. There is no auxiliary efficacy, synergy, symmetry or
 point-regression loss.
 
 Both stages use Adam, gradient clipping, validation-driven learning-rate
-reduction and early stopping. Defaults and all effective values are serialized in
-the configuration and checkpoints. Select VAE weights by its internal validation
-surrogate and final-model weights by final validation NLL. Test observations have
-no role in fitting, scheduling, stopping or selection.
+reduction and early stopping. The final stage uses L2 weight decay of `1e-3`;
+the offline VAE uses none. This is parameter regularization, not an auxiliary
+prediction loss: the final data-fit term remains the exact MDN NLL above. Every
+epoch records mean log scale, mean covariance log determinant, mixture entropy,
+and mixture-mean RMSE alongside NLL so covariance collapse is auditable. Defaults
+and all effective values are serialized in the configuration and checkpoints.
+Select VAE weights by its internal validation surrogate and final-model weights
+by final validation NLL. Test observations have no role in fitting, scheduling,
+stopping, hyperparameter choice or selection.
 
 ## Drug ordering and evaluation
 

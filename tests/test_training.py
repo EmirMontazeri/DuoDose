@@ -297,6 +297,26 @@ def test_vae_validation_uses_only_metadata_and_posterior_mean(
     assert checkpoint["progress"]["best_validation"] == pytest.approx(metrics["loss"])
 
 
+def test_final_loss_reports_covariance_collapse_diagnostics(
+    bundle: SyntheticBundle,
+    config: ExperimentConfig,
+) -> None:
+    model = training.make_model(bundle, config, "model")
+    data = bundle.dataset("train")
+    batch = training._batch(data, torch.arange(3), torch.device("cpu"))
+    metrics = training._loss(model, batch, "model", config.vae_beta)
+    assert set(metrics) == {
+        "loss",
+        "mean_log_scale",
+        "mean_covariance_log_determinant",
+        "mean_mixture_entropy",
+        "mixture_mean_rmse",
+    }
+    assert all(value.ndim == 0 and torch.isfinite(value) for value in metrics.values())
+    metrics["loss"].backward()
+    assert model.covariance_head.weight.grad is not None
+
+
 def test_offline_encoder_transfer_rejects_unselected_or_wrong_lineage(
     tmp_path: Path,
     bundle: SyntheticBundle,

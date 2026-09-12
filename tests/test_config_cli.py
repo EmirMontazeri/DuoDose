@@ -39,6 +39,9 @@ def test_invalid_configuration_is_rejected(values: dict) -> None:
 def test_effective_config_round_trip_and_distinct_split_paths() -> None:
     config = load_config(Path("configs/v2.yaml"))
     assert config_from_dict(config.to_dict()) == config
+    assert config.vae_training.weight_decay == 0.0
+    assert config.training.weight_decay == pytest.approx(1e-3)
+    assert config.training.early_stopping_patience == 8
     original = artifact_paths(config)
     config.split.seed += 1
     changed = artifact_paths(config)
