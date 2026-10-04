@@ -1,21 +1,6 @@
-# V2 executable protocol and scientific decisions
+# Executable protocol
 
-## Specification boundary
-
-[The proposal](../proposal.md) is authoritative for the model architecture. It
-specifies the independently trained frozen VAE encoder, the input encoder layer
-patterns, the four context projections, shared ordered drug-pair projection,
-two-coordinate products, shared deep MLP, fusion, and correlated bivariate MDN
-outputs. These components are implemented without an additional symmetry loss,
-forward-response model, complex arithmetic or a learned cell-ID embedding.
-
-The proposal does **not** specify the cell/drug feature definitions, VAE widths,
-numerical hyperparameters, objectives, response-grid sampling, split ratios,
-normalization, model-selection metric, numerical evaluation metrics or named
-benchmark experiments. The following are explicit executable baseline choices.
-They can be reviewed and changed through versioned code/configuration; they are
-not presented as requirements quoted from the proposal. The earlier
-[implementation plan](implementation_plan.md) records the design rationale.
+The [architecture](architecture.md) describes the frozen VAE encoder, shared input encoders, paired factorization and deep branches, fusion and bivariate MDN. This protocol defines the operational settings in [the default configuration](../configs/default.yaml). The [design decisions](design.md) explain their rationale.
 
 ## Source population, identifiers and observation construction
 
@@ -118,7 +103,7 @@ listed in the exclusion table. No surrogate small molecule is assigned.
 CMP `gene_id` is the stable feature key. The RNA-seq archive is streamed in full.
 The offline source population is every model marked as having Broad or Sanger
 **cell-line** RNA-seq in the released CMP availability catalog; organoid-only
-profiles are not cell lines and are outside the proposal's input population. The
+profiles are not cell lines and are outside the model's input population. The
 current catalog contains 1,643 such models. Models without any usable archive
 measurement are excluded and recorded; every mapped response model is required
 to have usable expression. For each model/gene, the raw feature is the arithmetic
@@ -162,16 +147,16 @@ Final validation/test metadata are transformed only after fitting, exactly as an
 unseen inference input would be. Manifests store all eligible, selected, validation
 and evaluation-excluded model and identity lists so this boundary is auditable.
 
-For raw TPM \(T*{cg}\), let \(L*{cg}=\log(1+T\_{cg})\). Compute each gene's mean
+For raw TPM \(T_{cg}\), let \(L_{cg}=\log(1+T_{cg})\). Compute each gene's mean
 from observed VAE-training-model measurements and impute its missing log-expression
 with that mean. Rank genes by population variance of the imputed VAE-training
 matrix, breaking ties by ascending gene ID; discard unobserved and zero-variance
 genes. Select up to `n_genes` (default 2,000) and standardize:
 
 \[
-X*{cg}=\frac{\widetilde L*{cg}-m*g}{s_g},\qquad
-s_g^2=\frac{1}{|C*{\mathrm{VAE,train}}|}
-\sum*{c\in C*{\mathrm{VAE,train}}}(\widetilde L\_{cg}-m_g)^2.
+X_{cg}=\frac{\widetilde L_{cg}-m_g}{s_g},\qquad
+s_g^2=\frac{1}{|C_{\mathrm{VAE,train}}|}
+\sum_{c\in C_{\mathrm{VAE,train}}}(\widetilde L_{cg}-m_g)^2.
 \]
 
 The selected IDs, means, scales and exact fitting cell IDs are saved. Inference
@@ -196,8 +181,8 @@ held-out dose ranges never choose scaling or default prediction-grid bounds.
 The original-unit density uses the exact Jacobian:
 
 \[
-\log p*D(D_A,D_B)=\log p_Y(Y_A,Y_B)
--\sum*{j\in\{A,B\}}\bigl[\log b+\log(r+D_j)\bigr].
+\log p_D(D_A,D_B)=\log p_Y(Y_A,Y_B)
+-\sum_{j\in\{A,B\}}\bigl[\log b+\log(r+D_j)\bigr].
 \]
 
 The MDN is Gaussian in scaled log-dose coordinates, so inverse transformation
@@ -210,16 +195,16 @@ grid mass is numerical trapezoidal quadrature, not an exact integration.
 ## Architecture and objectives
 
 The standalone VAE uses a diagonal-Gaussian posterior
-\(q*\phi(z\mid X)=\mathcal N(\mu*\phi(X),\operatorname{diag}(\exp\ell\_\phi(X)))\),
+\(q_\phi(z\mid X)=\mathcal N(\mu_\phi(X),\operatorname{diag}(\exp\ell_\phi(X)))\),
 a standard-normal prior and a mirrored dense decoder. Training uses one
 reparameterized sample per cell and the batch-mean objective
 
 \[
-\mathcal L*{\mathrm{VAE}}=
+\mathcal L_{\mathrm{VAE}}=
 \frac1B\sum_c\left[
-\frac12\|\widehat X_c-X_c\|\_2^2
+\frac12\|\widehat X_c-X_c\|_2^2
 +\frac{\beta}{2}\sum_k
-\left(\mu*{ck}^2+\exp\ell*{ck}-1-\ell*{ck}\right)\right],
+\left(\mu_{ck}^2+\exp\ell_{ck}-1-\ell_{ck}\right)\right],
 \qquad\beta=1.
 \]
 
@@ -234,12 +219,12 @@ After selecting the best offline checkpoint, remove its decoder and freeze every
 encoder parameter. Final-model compression uses the posterior mean. The trainable
 cell and shared drug encoders use `Linear → ReLU → Linear`; the inhibition encoder
 uses `Linear → ReLU`. With \(\oplus\) denoting concatenation and \(\odot\)
-element-wise multiplication, implement the proposal's exact factorization:
+element-wise multiplication, implement the model's exact factorization:
 
 \[
 \begin{aligned}
-U*1&=W*{C1}(E*c)\odot W*{X1}(E*I), &
-U_2&=W*{C2}(E*c)\odot W*{X2}(E_I),\\
+U_1&=W_{C1}(E_c)\odot W_{X1}(E_I), &
+U_2&=W_{C2}(E_c)\odot W_{X2}(E_I),\\
 D_1&=W_D(E_A\oplus E_B), &D_2&=W_D(E_B\oplus E_A),\\
 Z_1&=U_1\odot D_1+U_2\odot D_2, &
 Z_2&=U_1\odot D_2+U_2\odot D_1.
@@ -250,11 +235,11 @@ The same deep MLP processes `[Ec, EI, EA, EB]` and `[Ec, EI, EB, EA]` to obtain
 \(H_A,H_B\). Concatenate `[Z1,Z2,HA,HB]` into the unrestricted MDN heads:
 
 \[
-p*Y(y\mid c,A,B,I)=\sum*{m=1}^M\pi*m\mathcal N_2(y;\mu_m,\Sigma_m),
+p_Y(y\mid c,A,B,I)=\sum_{m=1}^M\pi_m\mathcal N_2(y;\mu_m,\Sigma_m),
 \qquad
 \Sigma_m=\begin{bmatrix}
-\sigma*{mA}^2&\rho*m\sigma*{mA}\sigma*{mB}\\
-\rho_m\sigma*{mA}\sigma*{mB}&\sigma*{mB}^2
+\sigma_{mA}^2&\rho_m\sigma_{mA}\sigma_{mB}\\
+\rho_m\sigma_{mA}\sigma_{mB}&\sigma_{mB}^2
 \end{bmatrix}.
 \]
 
@@ -264,8 +249,8 @@ avoid singular covariance. These are numerical safeguards, not alternate output
 representations. The final training objective is exact bivariate mixture NLL:
 
 \[
-\mathcal L*{\mathrm{final}}=-\frac1B\sum_i
-\log\sum_m\pi*{im}\mathcal N*2(y_i;\mu*{im},\Sigma\_{im}).
+\mathcal L_{\mathrm{final}}=-\frac1B\sum_i
+\log\sum_m\pi_{im}\mathcal N_2(y_i;\mu_{im},\Sigma_{im}).
 \]
 
 Component log densities are combined with `logsumexp`; correlation arithmetic
@@ -287,7 +272,7 @@ stopping, hyperparameter choice or selection.
 ## Drug ordering and evaluation
 
 Exchanging drugs exchanges \(Z_1\leftrightarrow Z_2\) and
-\(H_A\leftrightarrow H_B\) exactly. The proposal's unrestricted final linear MDN
+\(H_A\leftrightarrow H_B\) exactly. The model's unrestricted final linear MDN
 heads do **not** mathematically guarantee an equivariant distribution. The
 implementation preserves those heads and measures raw final-output swap
 differences. It does not silently replace the head or enforce equality through a
@@ -329,9 +314,9 @@ The near-target summary selects **observed** responses satisfying
 subset records zero count and null metrics. It does not relabel observations as
 exactly 50% inhibition. Multi-seed and warm/cold experiments retain separate
 per-run results and declared protocol/seed settings; no benchmark numbers are
-implied by the proposal.
+supported by the architecture.
 
-The versioned [evaluation assessment protocol](evaluation_assessment.md) defines
+The [evaluation assessment protocol](evaluation_assessment.md) defines
 the additional estimands and artifacts. Recommendations at fixed inhibition 0.5
 are frozen before revealing responses, snapped to the full original assay grid
 using dose distance only, then scored without response-based reselection. A

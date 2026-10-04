@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Final Proposal V2 dataset audit.
+Dose-response dataset audit.
 
 READ-ONLY for dataset/raw/.
 
@@ -20,10 +20,10 @@ Writes:
     dataset/manifests/audit_report.json
 
 Usage:
-    python audit_dataset.py
+    uv run python audit_dataset.py
 
 Strict mode:
-    python audit_dataset.py --strict
+    uv run python audit_dataset.py --strict
 
 Normal expected result with the current official source files:
     PASS_WITH_WARNINGS
@@ -96,7 +96,7 @@ KNOWN_STRUCTURE_GAPS = set(KNOWN_BIOLOGIC_NO_SMILES) | KNOWN_UNRESOLVED_AGENT_ST
 CHECKS: list[dict] = []
 
 
-# Silence harmless old-workbook style warnings.
+# Suppress harmless source-workbook style warnings.
 warnings.filterwarnings(
     "ignore",
     message="Workbook contains no default style.*",
@@ -435,7 +435,7 @@ def parse_dose_matrix(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=("Final audit of the Proposal V2 dataset."))
+    parser = argparse.ArgumentParser(description=("Audit the dose-response dataset."))
 
     parser.add_argument(
         "--root",
@@ -465,7 +465,7 @@ def main() -> int:
 
     cmp_dir = raw / "cell_model_passports"
 
-    print("Proposal V2 Final Dataset Audit")
+    print("Dose-response Dataset Audit")
 
     print(
         "Project root :",
@@ -544,7 +544,7 @@ def main() -> int:
         record(
             "Required files",
             "PASS",
-            ("All critical V2 " "source paths are present."),
+            ("All critical " "source paths are present."),
         )
 
     # Cannot continue meaningfully without source roots.

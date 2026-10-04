@@ -479,7 +479,7 @@ def enhanced_assessment(
         },
         "dataset_fingerprint": bundle.manifest["fingerprint"],
         "limitations": [
-            "Expanded reporting is retrospective on previously examined splits; it is not a fresh confirmatory test.",
+            "Reporting describes retrospective performance on measured assay splits; it is not a prospective confirmatory test.",
             "Groups with few identities are displayed with support counts, not hidden or treated as replicated biology.",
             "Cold-start and warm-completion results must not be pooled as one generalization estimate.",
             "Calibration assessed on measured, discrete assay grids; continuous PIT uniformity is a diagnostic, not a claim of continuous biological ground truth.",

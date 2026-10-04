@@ -111,7 +111,7 @@ def _loss(
         return vae_loss(reconstruction, batch, mean, logvar, beta=beta)
     parameters = model(batch["cell"], batch["inhibition"], batch["drug_a"], batch["drug_b"])
     weights = parameters.weights
-    # These metrics do not alter the proposal's exact MDN NLL objective. They
+    # These metrics do not alter the model's exact MDN NLL objective. They
     # expose the characteristic signature of conditional Gaussian collapse:
     # improving train NLL accompanied by shrinking covariance volume and poor
     # held-out NLL. Means are batch-additive, so epoch aggregation is exact.
@@ -399,7 +399,7 @@ def train_stage(
         for sig in (signal.SIGINT, signal.SIGTERM):
             old_handlers[sig] = signal.signal(sig, request_stop)
         if resume is not None:
-            # A user may resume an older periodic checkpoint into the same run
+            # A user may resume a periodic checkpoint into the same run
             # directory. The checkpoint is authoritative over any later artifacts.
             synchronize_selection()
         if state["completed"]:

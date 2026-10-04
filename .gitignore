@@ -54,10 +54,10 @@ runs/
 # Raw inputs (never commit raw external datasets)
 dataset/raw/
 
-# Generated heavy data / arrays (uncomment lines below if fully generated via scripts)
+# Generated tables, features and split artifacts
 dataset/processed/
 dataset/splits/
-dataset/manifests
+dataset/manifests/
 
 # Binary data file patterns
 *.parquet
@@ -68,10 +68,10 @@ dataset/manifests
 *.tar.gz
 *.zip
 
-# Predicted Runs
-predict
+# Prediction outputs
+predict/
 
-# Exceptions: Allow tracking metadata/manifests and markdown files inside dataset/
+# Dataset documentation and small metadata
 !dataset/**/*.json
 !dataset/**/*.jsonl
 !dataset/**/*.md

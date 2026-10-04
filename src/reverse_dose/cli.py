@@ -1,4 +1,4 @@
-"""Executable lifecycle for reproducible V2 experiments.
+"""Executable lifecycle for reproducible experiments.
 
 Run ``reverse-dose --help`` for stages. Relative paths resolve from the working
 directory. Commands refuse raw-data output paths and artifact overwrites.
@@ -46,11 +46,11 @@ def artifact_paths(config: ExperimentConfig) -> tuple[Path, Path, Path]:
     source_key = fingerprint({"sources": asdict(config.sources), "schema": SOURCE_SCHEMA_VERSION})[
         :12
     ]
-    source = root / "processed" / "dose_response" / f"v2_{source_key}"
+    source = root / "processed" / "dose_response" / f"source_{source_key}"
     expression_key = fingerprint(
         {"population": EXPRESSION_POPULATION, "schema": DATA_SCHEMA_VERSION}
     )[:12]
-    expression = root / "processed" / "cell_expression" / f"v2_{expression_key}"
+    expression = root / "processed" / "cell_expression" / f"expression_{expression_key}"
     split_key = fingerprint(
         {
             "source": source_key,
@@ -60,7 +60,7 @@ def artifact_paths(config: ExperimentConfig) -> tuple[Path, Path, Path]:
             "expression": expression_key,
         }
     )[:12]
-    prepared = root / "splits" / f"v2_{split_key}"
+    prepared = root / "splits" / f"split_{split_key}"
     return source, expression, prepared
 
 
@@ -189,7 +189,7 @@ def run(
 
 
 def _common_config(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--config", type=Path, default=Path("configs/v2.yaml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/default.yaml"))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -218,7 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
     expression.add_argument("--output", type=Path)
     for name, help_text in (
         ("train-vae", "Train the independent metadata VAE"),
-        ("train", "Train the V2 model using a selected frozen VAE encoder"),
+        ("train", "Train the dose-prediction model using a selected frozen VAE encoder"),
     ):
         stage = sub.add_parser(name, help=help_text)
         _common_config(stage)
@@ -373,7 +373,7 @@ def main(argv: list[str] | None = None) -> None:
                 "cell_mapping": mapping,
                 "configuration": config.to_dict(),
             }
-            output = root / "manifests" / "v2_inspection.json"
+            output = root / "manifests" / "inspection.json"
             atomic_json(output, payload)
             LOGGER.info(
                 "Audit=%s, uniquely mapped cells=%d, runtime=%s; wrote %s",
@@ -384,18 +384,18 @@ def main(argv: list[str] | None = None) -> None:
             )
         elif args.command == "preprocess":
             source = args.source_dir or artifact_paths(config)[0]
-            setup_logging(Path(config.dataset_root) / "manifests" / "v2_logs")
+            setup_logging(Path(config.dataset_root) / "manifests" / "logs")
             preprocess_sources(Path(config.dataset_root), asdict(config.sources), source)
         elif args.command == "extract-expression":
             cells, _, _ = map_cells(Path(config.dataset_root), config.sources.aliases)
-            setup_logging(Path(config.dataset_root) / "manifests" / "v2_logs")
+            setup_logging(Path(config.dataset_root) / "manifests" / "logs")
             extract_expression(
                 Path(config.dataset_root),
                 cells,
                 args.output or artifact_paths(config)[1],
             )
         elif args.command == "prepare":
-            setup_logging(Path(config.dataset_root) / "manifests" / "v2_logs")
+            setup_logging(Path(config.dataset_root) / "manifests" / "logs")
             prepare(config, args.source_dir, args.expression_dir, args.data_dir)
         elif args.command in {"train", "train-vae"}:
             setup_logging(args.run_dir)

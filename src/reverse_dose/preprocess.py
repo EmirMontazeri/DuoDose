@@ -1,4 +1,4 @@
-"""Immutable source ingestion for the explicit V2 experimental baseline.
+"""Immutable source ingestion for the dose-response pipeline.
 
 Corrected matrices supply measured grid points, without interpolation or replicate
 averaging. Internal Agent1 is the row axis and Agent2 the column axis; canonical
@@ -303,8 +303,8 @@ def _pubchem_property(payload: bytes, cid: int) -> tuple[str, str]:
         raise ValueError(f"PubChem CID {cid}: invalid property-response schema") from exc
     if not isinstance(properties, list) or len(properties) != 1 or properties[0].get("CID") != cid:
         raise ValueError(f"PubChem CID {cid}: returned identifier is not the exact requested CID")
-    # PUG REST renamed IsomericSMILES to SMILES; support both documented response
-    # names, never the connectivity-only property when stereo is requested.
+    # PUG REST responses may use SMILES or IsomericSMILES for stereochemistry;
+    # neither field is the connectivity-only property.
     for key in ["SMILES", "IsomericSMILES"]:
         value = properties[0].get(key)
         if isinstance(value, str):

@@ -1,4 +1,4 @@
-"""Mathematical and architectural invariants of the proposal implementation."""
+"""Mathematical and architectural invariants of the model implementation."""
 
 import io
 import math

@@ -1,9 +1,9 @@
-"""Proposal V2 architecture and probabilistic objectives.
+"""Reverse drug-combination dose prediction architecture and probabilistic objectives.
 
 All inputs are floating point batches. Cell/drug metadata have shape ``[B, N]``,
 inhibition has shape ``[B, 1]``, and transformed dose targets have shape ``[B, 2]``.
 The output distribution is over transformed doses; physical-unit conversions
-belong to the fitted preprocessing state. The proposal guarantees swapped paired
+belong to the fitted preprocessing state. The architecture guarantees swapped paired
 representations, but its unrestricted MDN head does not guarantee output symmetry.
 """
 
@@ -40,7 +40,7 @@ class VAEConfig:
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Widths and numerical covariance safeguards for the exact V2 model."""
+    """Widths and numerical covariance safeguards for the model."""
 
     encoder_dim: int = 64
     encoder_hidden_dim: int = 128
@@ -237,7 +237,7 @@ class MixtureParameters:
 
 
 class ReverseDoseModel(nn.Module):
-    """Exact two-path V2 architecture with a permanently frozen VAE encoder.
+    """Exact two-path architecture with a permanently frozen VAE encoder.
 
     A supplied encoder is copied, leaving the standalone VAE unchanged. Omitting
     it creates an encoder for subsequent checkpoint restoration; the training
@@ -301,7 +301,7 @@ class ReverseDoseModel(nn.Module):
     def representations(
         self, cell: Tensor, inhibition: Tensor, drug_a: Tensor, drug_b: Tensor
     ) -> dict[str, Tensor]:
-        """Return ``z1,z2,h_a,h_b,fusion`` with the proposal's exact equations."""
+        """Return ``z1,z2,h_a,h_b,fusion`` with the model's exact equations."""
         for name, tensor, width in (
             ("cell", cell, self.cell_dim),
             ("inhibition", inhibition, 1),

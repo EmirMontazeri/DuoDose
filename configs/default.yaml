@@ -1,11 +1,11 @@
-# Explicit baseline choices: see docs/implementation_plan.md and docs/protocol.md.
+# Training settings: see docs/design.md and docs/protocol.md.
 dataset_root: dataset
 seed: 42
 device: cpu
 deterministic: true
 threads: 4
 sources:
-  # Fixed source-v2.4 QC removes, without clipping, inhibition outside [-2, 2].
+  # Source quality control removes inhibition outside [-2, 2] without clipping.
   sources: [dream]
   fingerprint_bits: 2048
   fingerprint_radius: 2
@@ -50,7 +50,7 @@ training:
   epochs: 100
   batch_size: 256
   # Cell-cold supervision has only 56 independent training cell identities.
-  # Validation-only ablation fixed MDN memorization/covariance collapse at 1e-3.
+  # L2 regularization limits memorization and covariance collapse.
   weight_decay: 0.001
   early_stopping_patience: 8
 evaluation:

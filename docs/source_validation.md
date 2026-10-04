@@ -1,7 +1,6 @@
 # Complete source validation
 
-Both corrected-matrix releases were fully parsed with source schema
-`source-v2.4`; validation was not limited to the original audit's sampled files.
+Both corrected-matrix releases were fully parsed with the source schema.
 The runs used the default source policies, exact released PubChem identifier
 resolution, zero-dose inclusion, and no configured cell aliases. DREAM and OI
 were processed independently. These are ingestion results, not trained-model
@@ -22,26 +21,19 @@ performance measurements.
 | Retained observations outside biological interval `[0,1]`         |  49,645 |  69,114 |
 | Workbooks with incorrect `A1` declared dimensions read completely |  11,608 |  20,489 |
 
-The default DREAM artifacts are in
-`dataset/processed/dose_response/v2_2a3cd80276be/`, with identity
-`e44354cd782a96b7113f52d4c029a86ce5bedda898b73ff5e11bef0339260d24`.
-The separately configured OI artifacts are generated in
-`dataset/processed/dose_response/v2_18a34f622cc1/`, with identity
-`776999b0ac164291b6431cec65226979972ee4c63fcd0516002cda1af7df8eb2`.
-Exact source identities are recorded in each generated manifest and include
-cached CID retrieval provenance.
-These paths are computed from the source configuration and schema version; use
-the CLI to obtain the correct path after changing a source policy.
+Artifact directories are derived from source configuration and schema identity.
+Each manifest records exact source identities, output hashes and cached CID
+retrieval provenance. Use the CLI to resolve the destination for each source policy.
 
 Reproduce source preparation through the documented CLI:
 
 ```bash
-.venv/bin/reverse-dose preprocess --config configs/v2.yaml
-.venv/bin/reverse-dose preprocess --config configs/oi.yaml
+uv run reverse-dose preprocess --config configs/default.yaml
+uv run reverse-dose preprocess --config configs/oi.yaml
 ```
 
 Standalone preparation writes persistent logs to
-`dataset/manifests/v2_logs/pipeline.log`.
+`dataset/manifests/logs/pipeline.log`.
 
 ## Exclusions and identifier evidence
 
@@ -167,16 +159,15 @@ outputs. Generation timestamps are excluded from the scientific manifest so
 identical source/cache/code/config inputs regenerate identical manifest bytes.
 PubChem retrieval timestamps remain in the immutable cached retrieval provenance.
 
-Source schema v2.4 makes the inclusive bounds, remove-without-clipping action,
+The source schema makes the inclusive bounds, remove-without-clipping action,
 exclusion reason and pre-split execution stage part of the hashed source identity.
 It also records the observation and exclusion schemas, exact reason counts, raw
 excluded responses and computed inhibitions. Downstream preparation verifies both
 the declared policy and every retained inhibition value before assigning a split;
-a pre-v2.4 or internally inconsistent source artifact is rejected.
+an artifact with a mismatched schema or inconsistent policy is rejected.
 
 The preprocessing test module covers axis/drug orientation,
 units, malformed and missing numeric values, completely empty OI responses,
 aliases, immutable raw data, exact CID validation, offline cache reuse,
 manifest/output corruption, inclusive quality boundaries, raw-value-preserving
-quality exclusions, exclusions and byte-identical regeneration. Ruff passes for
-the preprocessing module and its tests.
+quality exclusions, exclusions and byte-identical regeneration.

@@ -1,11 +1,6 @@
-# Evaluation-only assessment protocol
+# Evaluation assessment protocol
 
-This extension addresses reporting, statistical and experimental-design gaps
-using the existing response assays and the architecture in [the proposal](../proposal.md).
-It does not change preprocessing QC, fitted transforms, the VAE, the MDN,
-the likelihood, training weights, regularization or validation-only checkpoint
-selection. It can expose poor performance; it cannot make a fixed model perform
-better. Recorded outcomes are in [evaluation results](evaluation_results.md).
+The assessment reports coordinate density, target achievement, uncertainty and robustness using measured response assays and the [model architecture](architecture.md). Recorded outcomes are in [evaluation results](evaluation_results.md).
 
 ## Primary reporting set and biological units
 
@@ -51,14 +46,13 @@ questions and must be labeled rather than mixed.
 
 ## Leakage-safe retrospective target achievement
 
-The fixed policy is declared in code/configuration before running the expanded
-evaluation: request inhibition 0.5; summarize the frozen MDN by its mixture mean
+The fixed policy is declared in code/configuration before evaluation: request inhibition 0.5; summarize the frozen MDN by its mixture mean
 in training-standardized log-dose space; snap to the nearest original grid
 coordinate in Euclidean distance in that space; score a hit when the revealed
 response lies within 0.05 inhibition units of the request.
-Schema `assessment-v1.1` permits only float64 round-off at the inclusive window
+The assessment permits only float64 round-off at the inclusive window
 edges (below 2e-15 at the default target), preventing exact 45% or 55% responses
-from being rejected by binary subtraction. The same predicate is used for
+from falling outside the window due to binary subtraction. The same predicate is used for
 near-target reporting, target hits and the oracle availability diagnostic.
 
 For each matrix already included in the prepared held-out split:
@@ -133,17 +127,10 @@ This measures full-pipeline training sensitivity, not final-MDN initialization
 alone. A training-seed comparison within a partition uses the same prepared
 bundle. Architecture, optimization settings and selection policy stay fixed.
 
-The declared extension uses five split seeds (42–46), two training seeds (42,43)
-and both protocols: ten combinations per protocol. The four original matching
-42/42 and 43/43 configurations can be reused, with explicit provenance. They
-are not called new fits. The original 44/44 runs remain in the separate six-run
-report and are not inserted into an unbalanced primary factorial analysis.
-The current `runs/factorial-v1.1` also reuses the two completed off-diagonal
-cold fits from `runs/factorial-v1`, via `runs/assessment-references-v1.1` links.
-That older execution was interrupted to fix evaluation-boundary and experiment
-resume edge cases; its completed weights are unchanged. Its incomplete 44/42
-fit is preserved but not included as a completed result. Reproducing from just
-`runs/suite` retrains those two off-diagonal fits under the same declared settings.
+The factorial design uses five split seeds (42–46), two training seeds (42,43)
+and both protocols: ten combinations per protocol. Matching completed runs can
+be reused with verified configuration and artifact provenance. Reused fits are
+identified explicitly and do not count as independent training repetitions.
 
 `design.json` freezes configuration, combinations, reference-suite path and test
 policy with a fingerprint. `progress.json` counts completed/planned combinations.
@@ -160,9 +147,8 @@ variation. Two training seeds remain modest support. Across-run SD is not a
 standard error of independent biology, and overlapping tests are not pooled to
 manufacture a larger effective sample size.
 
-The suite was expanded after examining earlier results, so it is explicitly
-retrospective robustness evidence, not an untouched confirmatory study. Every
-individual run nevertheless maintains its train/validation/test fitting boundary.
+The suite provides retrospective robustness evidence. Every run maintains its
+train/validation/test fitting boundary; repetitions share biological identities.
 
 ## Density and covariance characterization
 

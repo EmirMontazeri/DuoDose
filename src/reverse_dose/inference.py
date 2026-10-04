@@ -32,7 +32,7 @@ class Predictor:
 
     Drug identifiers are canonicalized exactly as during source preparation;
     returned coordinates are restored to the caller's requested A/B order.
-    The distribution remains the proposal's original M-component MDN.
+    The distribution remains the specified M-component MDN.
     """
 
     def __init__(self, data_dir: Path, checkpoint: Path, device: str = "cpu"):

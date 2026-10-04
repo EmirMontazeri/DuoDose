@@ -48,7 +48,7 @@ def run_factorial(
 ) -> dict[str, Any]:
     """Run all declared combinations; reuse only exact scientific reference matches.
 
-    Existing legacy diagonal experiments can be imported, never relabeled as new
+    Completed matching experiments can be imported, never relabeled as new
     independent runs. Configuration differences in evaluation-only settings do
     not change trained weights. References are revalidated before reassessment.
     """

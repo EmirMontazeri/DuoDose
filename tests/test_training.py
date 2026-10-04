@@ -66,7 +66,7 @@ def bundle() -> SyntheticBundle:
         rng.normal(size=(3, 4)).astype(np.float32),
         np.array([0, 1, 2, 3, 4]),
         np.array([5]),
-        {"fingerprint": "synthetic-training-fixture-v1"},
+        {"fingerprint": "synthetic-training-fixture"},
     )
 
 
