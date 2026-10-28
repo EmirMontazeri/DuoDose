@@ -1,6 +1,6 @@
 # Executable protocol
 
-The [architecture](architecture.md) describes the frozen VAE encoder, shared input encoders, paired factorization and deep branches, fusion and bivariate MDN. This protocol defines the operational settings in [the default configuration](../configs/default.yaml). The [design decisions](design.md) explain their rationale.
+The [architecture](architecture.md) describes the frozen VAE encoder, shared input encoders, paired factorization and deep branches, fusion and bivariate MDN. This protocol defines the operational settings in [the default configuration](../configs/astra_zeneca.yaml). The [design decisions](design.md) explain their rationale.
 
 ## Source population, identifiers and observation construction
 

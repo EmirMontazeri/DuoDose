@@ -1,0 +1,7 @@
+# Source-comparison experiment using AstraZeneca–DREAM corrected OI matrices.
+# Standalone: unspecified settings use Python defaults, not another YAML file.
+# The DREAM-only configuration is configs/astra_zeneca.yaml.
+dataset_root: dataset
+dataset_name: AstraZeneca–DREAM
+sources:
+  sources: [oi]

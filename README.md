@@ -23,7 +23,7 @@ environment uses Python 3.12 and CPU. Install the dependencies recorded in `uv.l
 ```bash
 uv sync --extra dev --locked
 uv run reverse-dose --help
-uv run reverse-dose inspect --config configs/default.yaml
+uv run reverse-dose inspect --config configs/astra_zeneca.yaml
 uv run pytest -q
 ```
 
@@ -70,7 +70,7 @@ than silently reducing the selected cohort.
 Perform the short real-source integration check:
 
 ```bash
-uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/integration
+uv run reverse-dose run --config configs/astra_zeneca_smoke.yaml --run-dir runs/integration
 ```
 
 The smoke configuration uses 240 systematically selected matrices, small feature
@@ -80,7 +80,7 @@ artifact generation; they are not scientific performance estimates.
 Train the default model with:
 
 ```bash
-uv run reverse-dose run --config configs/default.yaml --run-dir runs/default
+uv run reverse-dose run --config configs/astra_zeneca.yaml --run-dir runs/default
 ```
 
 `run` prepares the source tables and expression, constructs grouped splits and
@@ -96,8 +96,8 @@ covariance collapse on cell-disjoint splits.
 Resume a run created with the current schema without changing its settings:
 
 ```bash
-uv run reverse-dose run --config configs/smoke.yaml --run-dir runs/integration --resume
-uv run reverse-dose run --config configs/default.yaml --run-dir runs/default --resume
+uv run reverse-dose run --config configs/astra_zeneca_smoke.yaml --run-dir runs/integration --resume
+uv run reverse-dose run --config configs/astra_zeneca.yaml --run-dir runs/default --resume
 ```
 
 SIGINT/SIGTERM requests checkpoint creation after the active minibatch completes.
@@ -114,15 +114,15 @@ before reuse. Use a separate output directory whenever experiment settings chang
 Every stage has an executable entry point. For explicit artifact paths:
 
 ```bash
-uv run reverse-dose preprocess --config configs/default.yaml \
+uv run reverse-dose preprocess --config configs/astra_zeneca.yaml \
   --source-dir dataset/processed/AstraZeneca–DREAM/dose_response/manual
-uv run reverse-dose extract-expression --config configs/default.yaml
-uv run reverse-dose prepare --config configs/default.yaml \
+uv run reverse-dose extract-expression --config configs/astra_zeneca.yaml
+uv run reverse-dose prepare --config configs/astra_zeneca.yaml \
   --source-dir dataset/processed/AstraZeneca–DREAM/dose_response/manual \
   --data-dir dataset/splits/AstraZeneca–DREAM/manual
-uv run reverse-dose train-vae --config configs/default.yaml \
+uv run reverse-dose train-vae --config configs/astra_zeneca.yaml \
   --data-dir dataset/splits/AstraZeneca–DREAM/manual --run-dir runs/stages
-uv run reverse-dose train --config configs/default.yaml \
+uv run reverse-dose train --config configs/astra_zeneca.yaml \
   --data-dir dataset/splits/AstraZeneca–DREAM/manual --run-dir runs/stages \
   --vae-checkpoint runs/stages/vae/best.pt
 ```
@@ -135,7 +135,7 @@ resolved prepared path for a pipeline run is recorded in `runs/default/run.json`
 For an individual stage, resume with an explicit checkpoint:
 
 ```bash
-uv run reverse-dose train --config configs/default.yaml \
+uv run reverse-dose train --config configs/astra_zeneca.yaml \
   --data-dir dataset/splits/AstraZeneca–DREAM/manual --run-dir runs/stages \
   --vae-checkpoint runs/stages/vae/best.pt \
   --resume runs/stages/model/last.pt
@@ -152,7 +152,7 @@ Use the prepared path recorded by the completed pipeline:
 
 ```bash
 PREPARED_DATA=$(uv run python -c 'import json; print(json.load(open("runs/default/run.json"))["data_dir"])')
-uv run reverse-dose evaluate --config configs/default.yaml \
+uv run reverse-dose evaluate --config configs/astra_zeneca.yaml \
   --data-dir "$PREPARED_DATA" --checkpoint runs/default/model/best.pt \
   --split test --output runs/default/evaluation/test_recheck
 uv run reverse-dose export --data-dir "$PREPARED_DATA" \
@@ -204,7 +204,7 @@ uv run --frozen reverse-dose assess-suite --suite runs/five_split_two_train_seed
 Run a frozen Cartesian design with **independent** partition and training seeds:
 
 ```bash
-uv run --frozen reverse-dose experiments --config configs/default.yaml \
+uv run --frozen reverse-dose experiments --config configs/astra_zeneca.yaml \
   --output runs/factorial --split-seeds 42 43 44 45 46 \
   --training-seeds 42 43 --protocols cell cell_pair
 ```

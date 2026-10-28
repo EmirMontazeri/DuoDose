@@ -28,8 +28,8 @@ retrieval provenance. Use the CLI to resolve the destination for each source pol
 Reproduce source preparation through the documented CLI:
 
 ```bash
-uv run reverse-dose preprocess --config configs/default.yaml
-uv run reverse-dose preprocess --config configs/oi.yaml
+uv run reverse-dose preprocess --config configs/astra_zeneca.yaml
+uv run reverse-dose preprocess --config configs/astra_zeneca_oi_source_comparison.yaml
 ```
 
 Standalone preparation writes persistent logs to

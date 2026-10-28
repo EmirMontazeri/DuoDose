@@ -1,6 +1,0 @@
-# Explicit source-sensitivity experiment. Unspecified settings use the defaults.
-# The DREAM-only configuration is configs/default.yaml.
-dataset_root: dataset
-dataset_name: AstraZeneca–DREAM
-sources:
-  sources: [oi]

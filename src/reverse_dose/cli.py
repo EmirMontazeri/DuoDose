@@ -197,7 +197,7 @@ def run(
 
 
 def _common_config(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--config", type=Path, default=Path("configs/default.yaml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/astra_zeneca.yaml"))
 
 
 def build_parser() -> argparse.ArgumentParser:
