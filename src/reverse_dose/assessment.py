@@ -19,6 +19,7 @@ from scipy.special import logsumexp, ndtr
 
 from .config import EvaluationConfig
 from .data import DataBundle
+from .layout import DEFAULT_DATASET_NAME, DatasetPaths
 from .preprocess import parse_corrected_matrix
 from .utils import atomic_json, read_json, sha256_file
 
@@ -238,7 +239,13 @@ def grouped_primary(
     }
 
 
-def matrix_design(bundle: DataBundle, dataset_root: Path, split: str) -> pd.DataFrame:
+def matrix_design(
+    bundle: DataBundle,
+    dataset_root: Path,
+    split: str,
+    *,
+    dataset_name: str = DEFAULT_DATASET_NAME,
+) -> pd.DataFrame:
     """Reconstruct full original grids from hash-verified workbooks, including missing/QC rows.
 
     The returned table contains no response values or missingness masks. Matrix
@@ -246,14 +253,15 @@ def matrix_design(bundle: DataBundle, dataset_root: Path, split: str) -> pd.Data
     not surviving response coordinates, define selection candidates.
     """
     source = read_json(bundle.path / "source_manifest.json")
+    paths = DatasetPaths(dataset_root, dataset_name)
     hashes = {entry["path"]: entry["sha256"] for entry in source["raw_files"]}
     rows = []
     metadata = bundle.observations.loc[bundle.observations.split.eq(split)]
     for matrix_id, g in metadata.groupby("matrix_id", sort=True):
         first = g.iloc[0]
         relative = first.source_file
-        path = (dataset_root / relative).resolve()
-        if not path.is_relative_to((dataset_root / "raw").resolve()):
+        path = paths.source_path(relative).resolve()
+        if not path.is_relative_to(paths.raw.resolve()):
             raise ValueError("Matrix source must be under dataset/raw")
         if sha256_file(path) != hashes[relative]:
             raise ValueError(f"Raw matrix hash mismatch: {relative}")
@@ -447,7 +455,9 @@ def enhanced_assessment(
     }
     if include_target:
         if design is None:
-            design = matrix_design(bundle, Path(config.dataset_root), split)
+            design = matrix_design(
+                bundle, Path(config.dataset_root), split, dataset_name=config.dataset_name
+            )
         expected_matrices = set(expected.matrix_id)
         if set(design.matrix_id) != expected_matrices:
             raise ValueError("Target design must cover exactly the requested split matrices")

@@ -143,9 +143,17 @@ def test_factorial_design_crosses_every_split_and_training_seed() -> None:
         factorial_design([42, 42], [1], ["cell"])
 
 
-def test_original_matrix_axes_include_missing_and_qc_excluded_candidates(tmp_path: Path) -> None:
+@pytest.mark.parametrize("legacy_provenance", [False, True])
+def test_original_matrix_axes_include_missing_and_qc_excluded_candidates(
+    tmp_path: Path, legacy_provenance: bool
+) -> None:
     root = tmp_path / "dataset"
-    raw = root / "raw" / "matrix.xlsx"
+    relative = (
+        "raw/az_dream/matrix.xlsx"
+        if legacy_provenance
+        else "raw/AstraZeneca–DREAM/az_dream/matrix.xlsx"
+    )
+    raw = root / "raw" / "AstraZeneca–DREAM" / "az_dream" / "matrix.xlsx"
     prepared = tmp_path / "prepared"
     prepared.mkdir()
     # Only one retained response row is present. All four ORIGINAL coordinates
@@ -156,7 +164,7 @@ def test_original_matrix_axes_include_missing_and_qc_excluded_candidates(tmp_pat
             [
                 {
                     "matrix_id": "m",
-                    "source_file": "raw/matrix.xlsx",
+                    "source_file": relative,
                     "split": "test",
                     "canonical_order_swapped": True,
                     "cell_id": "c",
@@ -172,7 +180,7 @@ def test_original_matrix_axes_include_missing_and_qc_excluded_candidates(tmp_pat
         atomic_json(
             prepared / "source_manifest.json",
             {
-                "raw_files": [{"path": "raw/matrix.xlsx", "sha256": sha256_file(raw)}],
+                "raw_files": [{"path": relative, "sha256": sha256_file(raw)}],
                 "config": {"include_zero_doses": True},
             },
         )
