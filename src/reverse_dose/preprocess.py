@@ -105,6 +105,9 @@ DEFAULTS: dict[str, Any] = {
     "resolve_pubchem": True,
     "pubchem_timeout_seconds": 30,
     "pubchem_retries": 3,
+    "nci_response": "percent_control",
+    "nci_missing_no_tz": "reconstruct",
+    "oneil_batches": [1, 2, 3],
 }
 
 
@@ -169,6 +172,7 @@ def map_cells(
     aliases: dict[str, dict[str, str]] | None = None,
     *,
     dataset_name: str = DEFAULT_DATASET_NAME,
+    reference_dataset_name: str | None = None,
 ) -> tuple[pd.DataFrame, dict[str, str], dict[str, Any]]:
     """Map DREAM cells to CMP by exact unique COSMIC identifiers.
 
@@ -179,7 +183,8 @@ def map_cells(
     dataset_root = Path(dataset_root)
     paths = DatasetPaths(dataset_root, dataset_name)
     dream_path = paths.raw / "az_dream_molecular/cell_info.csv"
-    cmp_paths = sorted((paths.raw / "cell_model_passports").glob("model_list_*.csv"))
+    reference = DatasetPaths(dataset_root, reference_dataset_name or dataset_name)
+    cmp_paths = sorted((reference.raw / "cell_model_passports").glob("model_list_*.csv"))
     if len(cmp_paths) != 1:
         raise ValueError(f"Expected one immutable CMP model_list release, found {cmp_paths}")
     cmp_path = cmp_paths[0]
@@ -715,10 +720,24 @@ def _effective_config(config: dict[str, Any]) -> dict[str, Any]:
     effective = {**DEFAULTS, **config}
     if (
         not effective["sources"]
-        or set(effective["sources"]) - set(SOURCE_DIRECTORIES)
+        or set(effective["sources"]) - {*SOURCE_DIRECTORIES, "nci_almanac", "oneil"}
         or len(set(effective["sources"])) != len(effective["sources"])
     ):
-        raise ValueError("sources must be a nonempty unique subset of ['dream', 'oi']")
+        raise ValueError("sources must contain unique supported matrix sources")
+    if set(effective["sources"]) & {"nci_almanac", "oneil"} and len(effective["sources"]) != 1:
+        raise ValueError("Different datasets must be trained separately; sources cannot be mixed")
+    if effective["nci_response"] not in {"percent_control", "percent_growth"}:
+        raise ValueError("nci_response must be percent_control or percent_growth")
+    if effective["nci_missing_no_tz"] not in {"reconstruct", "exclude", "error"}:
+        raise ValueError("Invalid nci_missing_no_tz policy")
+    batches = effective["oneil_batches"]
+    if (
+        not isinstance(batches, list)
+        or not batches
+        or any(type(batch) is not int or batch not in {1, 2, 3} for batch in batches)
+        or len(set(batches)) != len(batches)
+    ):
+        raise ValueError("oneil_batches must be a unique nonempty subset of [1, 2, 3]")
     for key in ["fingerprint_bits", "workers"]:
         if (
             not isinstance(effective[key], int)
@@ -773,6 +792,7 @@ def preprocess_sources(
     output_dir: Path,
     *,
     dataset_name: str = DEFAULT_DATASET_NAME,
+    reference_dataset_name: str | None = None,
 ) -> dict[str, Any]:
     """Build source tables and fingerprints atomically, returning their manifest.
 
@@ -786,6 +806,16 @@ def preprocess_sources(
     layout = DatasetPaths(dataset_root, dataset_name)
     _safe_output(dataset_root, output_dir)
     effective = _effective_config(config)
+    if effective["sources"][0] in {"nci_almanac", "oneil"}:
+        from .screens import preprocess_screen
+
+        return preprocess_screen(
+            dataset_root,
+            effective,
+            output_dir,
+            dataset_name=dataset_name,
+            reference_dataset_name=reference_dataset_name,
+        )
     LOGGER.info("Inspecting corrected dose matrices: sources=%s", effective["sources"])
     paths: list[tuple[str, Path]] = []
     source_counts = {}
@@ -810,7 +840,10 @@ def preprocess_sources(
             sum(source_counts.values()),
         )
     cells, names, cell_provenance = map_cells(
-        dataset_root, effective["aliases"], dataset_name=dataset_name
+        dataset_root,
+        effective["aliases"],
+        dataset_name=dataset_name,
+        reference_dataset_name=reference_dataset_name,
     )
     drugs, drug_ids, drug_features, chemistry_sources = build_drug_features(
         dataset_root,
@@ -852,6 +885,7 @@ def preprocess_sources(
     }
     identity = {
         "schema_version": SCHEMA_VERSION,
+        "dataset_name": dataset_name,
         "config": effective,
         "response_quality_control": response_quality_control(),
         "raw_files": raw_files,

@@ -31,6 +31,9 @@ class SourceConfig:
     pubchem_retries: int = 3
     max_matrices: int | None = None
     workers: int = 4
+    nci_response: str = "percent_control"
+    nci_missing_no_tz: str = "reconstruct"
+    oneil_batches: list[int] = field(default_factory=lambda: [1, 2, 3])
 
 
 @dataclass
@@ -89,6 +92,7 @@ class ExperimentConfig:
 
     dataset_root: str = "dataset"
     dataset_name: str = DEFAULT_DATASET_NAME
+    cell_reference_dataset: str | None = None
     seed: int = 42
     device: str = "cpu"
     deterministic: bool = True
@@ -124,6 +128,8 @@ class ExperimentConfig:
 
         finite(self.to_dict())
         DatasetPaths(Path(self.dataset_root), self.dataset_name)
+        if self.cell_reference_dataset is not None:
+            DatasetPaths(Path(self.dataset_root), self.cell_reference_dataset)
         if self.seed < 0 or self.threads < 1 or self.vae_beta <= 0:
             raise ValueError("seed >= 0, threads >= 1 and vae_beta > 0 required")
         if self.device not in {"auto", "cpu", "cuda", "mps"}:
@@ -140,8 +146,24 @@ class ExperimentConfig:
         if self.features.n_genes < 1 or self.features.dose_reference_um <= 0:
             raise ValueError("n_genes and dose_reference_um must be positive")
         source = self.sources
-        if not source.sources or set(source.sources) - {"dream", "oi"}:
-            raise ValueError("sources.sources must contain dream and/or oi")
+        if not source.sources or set(source.sources) - {"dream", "oi", "nci_almanac", "oneil"}:
+            raise ValueError("sources.sources must contain dream, oi, nci_almanac or oneil")
+        if set(source.sources) & {"nci_almanac", "oneil"} and len(source.sources) != 1:
+            raise ValueError(
+                "Different datasets must be trained separately; sources cannot be mixed"
+            )
+        if source.nci_response not in {"percent_control", "percent_growth"}:
+            raise ValueError("nci_response must be percent_control or percent_growth")
+        if source.nci_missing_no_tz not in {"reconstruct", "exclude", "error"}:
+            raise ValueError("nci_missing_no_tz must be reconstruct, exclude or error")
+        if (
+            not source.oneil_batches
+            or any(
+                type(batch) is not int or batch not in {1, 2, 3} for batch in source.oneil_batches
+            )
+            or len(set(source.oneil_batches)) != len(source.oneil_batches)
+        ):
+            raise ValueError("oneil_batches must be a unique nonempty subset of [1, 2, 3]")
         if len(set(source.sources)) != len(source.sources):
             raise ValueError("Repeated matrix source")
         if source.workers < 1 or source.fingerprint_bits < 1 or source.fingerprint_radius < 0:

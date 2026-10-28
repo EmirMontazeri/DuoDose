@@ -44,12 +44,29 @@ LOGGER = logging.getLogger(__name__)
 def artifact_paths(config: ExperimentConfig) -> tuple[Path, Path, Path]:
     """Compute stable configuration-specific source and prepared paths."""
     paths = DatasetPaths(Path(config.dataset_root), config.dataset_name)
-    source_key = fingerprint({"sources": asdict(config.sources), "schema": SOURCE_SCHEMA_VERSION})[
-        :12
-    ]
+    source_schema = SOURCE_SCHEMA_VERSION
+    implementation = {}
+    if config.sources.sources[0] in {"oneil", "nci_almanac"}:
+        from .screens import SCHEMA_VERSION as SCREEN_SCHEMA_VERSION
+        from .screens import implementation_identity
+
+        source_schema = SCREEN_SCHEMA_VERSION
+        implementation = implementation_identity()
+    source_key = fingerprint(
+        {
+            "sources": asdict(config.sources),
+            "schema": source_schema,
+            "cell_reference_dataset": config.cell_reference_dataset,
+            "implementation": implementation,
+        }
+    )[:12]
     source = paths.processed / "dose_response" / f"source_{source_key}"
     expression_key = fingerprint(
-        {"population": EXPRESSION_POPULATION, "schema": DATA_SCHEMA_VERSION}
+        {
+            "population": EXPRESSION_POPULATION,
+            "schema": DATA_SCHEMA_VERSION,
+            "cell_reference_dataset": config.cell_reference_dataset,
+        }
     )[:12]
     expression = paths.processed / "cell_expression" / f"expression_{expression_key}"
     split_key = fingerprint(
@@ -91,10 +108,15 @@ def prepare(
         asdict(config.sources),
         source_dir,
         dataset_name=config.dataset_name,
+        reference_dataset_name=config.cell_reference_dataset,
     )
     cells = pd.read_parquet(source_dir / "cells.parquet")
     extract_expression(
-        Path(config.dataset_root), cells, expression_dir, dataset_name=config.dataset_name
+        Path(config.dataset_root),
+        cells,
+        expression_dir,
+        dataset_name=config.dataset_name,
+        reference_dataset_name=config.cell_reference_dataset,
     )
     prepare_dataset(
         source_dir,
@@ -208,6 +230,11 @@ def build_parser() -> argparse.ArgumentParser:
         "inspect", help="Read audit, cell mapping and compute/runtime information"
     )
     _common_config(inspect)
+    fetch = sub.add_parser(
+        "fetch-official",
+        help="Download and checksum original publisher supplements and NIH chemistry references",
+    )
+    _common_config(fetch)
     for name, help_text in (
         ("preprocess", "Parse raw corrected matrices and released drug chemistry"),
         ("prepare", "Reproduce sources, expression, splits and train-only transforms"),
@@ -367,16 +394,46 @@ def main(argv: list[str] | None = None) -> None:
             return
         config = load_config(args.config)
         paths = DatasetPaths(Path(config.dataset_root), config.dataset_name)
+        if args.command == "fetch-official":
+            from .downloads import fetch_official
+
+            fetch_official(
+                Path(config.dataset_root), config.dataset_name, config.sources.sources[0]
+            )
+            return
         for name in ("output", "run_dir", "source_dir", "expression_dir", "data_dir"):
             path = getattr(args, name, None)
             if path is not None:
                 guard_output(path, Path(config.dataset_root))
         if args.command == "inspect":
             root = Path(config.dataset_root)
-            audit = read_json(paths.manifests / "audit_report.json")
-            cells, _, mapping = map_cells(
-                root, config.sources.aliases, dataset_name=config.dataset_name
-            )
+            if config.sources.sources[0] in {"nci_almanac", "oneil"}:
+                manifest = preprocess_sources(
+                    root,
+                    asdict(config.sources),
+                    artifact_paths(config)[0],
+                    dataset_name=config.dataset_name,
+                    reference_dataset_name=config.cell_reference_dataset,
+                )
+                audit = {
+                    "overall_status": (
+                        "PASS_WITH_EXCLUSIONS"
+                        if manifest["counts"]["excluded_by_reason"]
+                        else "PASS"
+                    ),
+                    "counts": manifest["counts"],
+                    "source_inventory": manifest["source_inventory"],
+                }
+                cells = pd.read_parquet(artifact_paths(config)[0] / "cells.parquet")
+                mapping = manifest["cell_mapping"]
+            else:
+                audit = read_json(paths.manifests / "audit_report.json")
+                cells, _, mapping = map_cells(
+                    root,
+                    config.sources.aliases,
+                    dataset_name=config.dataset_name,
+                    reference_dataset_name=config.cell_reference_dataset,
+                )
             payload = {
                 "audit": audit,
                 "environment": environment_info(),
@@ -401,17 +458,33 @@ def main(argv: list[str] | None = None) -> None:
                 asdict(config.sources),
                 source,
                 dataset_name=config.dataset_name,
+                reference_dataset_name=config.cell_reference_dataset,
             )
         elif args.command == "extract-expression":
-            cells, _, _ = map_cells(
-                Path(config.dataset_root), config.sources.aliases, dataset_name=config.dataset_name
-            )
+            if config.sources.sources[0] in {"nci_almanac", "oneil"}:
+                source = artifact_paths(config)[0]
+                preprocess_sources(
+                    Path(config.dataset_root),
+                    asdict(config.sources),
+                    source,
+                    dataset_name=config.dataset_name,
+                    reference_dataset_name=config.cell_reference_dataset,
+                )
+                cells = pd.read_parquet(source / "cells.parquet")
+            else:
+                cells, _, _ = map_cells(
+                    Path(config.dataset_root),
+                    config.sources.aliases,
+                    dataset_name=config.dataset_name,
+                    reference_dataset_name=config.cell_reference_dataset,
+                )
             setup_logging(paths.manifests / "logs")
             extract_expression(
                 Path(config.dataset_root),
                 cells,
                 args.output or artifact_paths(config)[1],
                 dataset_name=config.dataset_name,
+                reference_dataset_name=config.cell_reference_dataset,
             )
         elif args.command == "prepare":
             setup_logging(paths.manifests / "logs")

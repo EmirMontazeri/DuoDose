@@ -1,0 +1,45 @@
+# Independent ONeil-Merck integration check; metrics are not scientific results.
+# CMP is an explicit shared expression reference, with fitting performed per run.
+dataset_root: dataset
+dataset_name: ONeil-Merck
+seed: 7
+device: cpu
+threads: 4
+sources:
+  max_matrices: 240
+  fingerprint_bits: 128
+  workers: 4
+  sources:
+  - oneil
+  include_zero_doses: false
+  oneil_batches:
+  - 1
+  - 2
+  - 3
+split:
+  seed: 7
+features:
+  n_genes: 64
+vae:
+  hidden_dims:
+  - 32
+  latent_dim: 8
+model:
+  encoder_dim: 8
+  encoder_hidden_dim: 16
+  mf_dim: 4
+  deep_hidden_dims:
+  - 32
+  deep_dim: 16
+  mixture_components: 3
+vae_training:
+  epochs: 2
+  batch_size: 16
+  log_every_steps: 1
+  checkpoint_every_steps: 2
+training:
+  epochs: 2
+  batch_size: 128
+  log_every_steps: 5
+  checkpoint_every_steps: 10
+cell_reference_dataset: AstraZeneca–DREAM

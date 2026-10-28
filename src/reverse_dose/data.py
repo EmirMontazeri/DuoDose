@@ -243,6 +243,7 @@ def extract_expression(
     chunk_size: int = 250_000,
     *,
     dataset_name: str = DEFAULT_DATASET_NAME,
+    reference_dataset_name: str | None = None,
 ) -> Path:
     """Stream and aggregate all released CMP cell-line RNA-seq model/gene values.
 
@@ -253,7 +254,7 @@ def extract_expression(
     Multiple source/dataset measurements are averaged without weighting.
     """
     dataset_root, output_dir = Path(dataset_root), Path(output_dir)
-    paths = DatasetPaths(dataset_root, dataset_name)
+    paths = DatasetPaths(dataset_root, reference_dataset_name or dataset_name)
     _guard_output(output_dir, dataset_root)
     _require_columns(cells, {"cell_id", "model_id"}, "cells")
     _ids(cells["cell_id"].tolist(), "cell_id")
@@ -782,6 +783,9 @@ def prepare_dataset(
     ]
     expression_files = ["expression.npz", "expression_manifest.json"]
     source_manifest = json.loads((source_dir / "source_manifest.json").read_text())
+    has_design = "matrix_design.parquet" in source_manifest.get("output_hashes", {})
+    if has_design:
+        source_files.append("matrix_design.parquet")
     expression_manifest = json.loads((expression_dir / "expression_manifest.json").read_text())
     if source_manifest.get("response_quality_control") != response_quality_control():
         raise ValueError(
@@ -790,7 +794,7 @@ def prepare_dataset(
     source_hashes = source_manifest.get("output_hashes", {})
     expression_hashes = expression_manifest.get("artifacts", {})
     if (
-        not set(source_files[:-1]) <= set(source_hashes)
+        not (set(source_files) - {"source_manifest.json"}) <= set(source_hashes)
         or "expression.npz" not in expression_hashes
     ):
         raise ValueError(
@@ -1059,9 +1063,17 @@ def prepare_dataset(
         "source_manifest.json",
         "expression_manifest.json",
     ]
+    if has_design:
+        _atomic_bytes(
+            output_dir / "matrix_design.parquet",
+            (source_dir / "matrix_design.parquet").read_bytes(),
+        )
+        artifact_names.append("matrix_design.parquet")
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "preparation_identity": preparation_identity,
+        "dataset_name": source_manifest.get("dataset_name"),
+        "sources": source_manifest.get("config", {}).get("sources"),
         "lineage": lineage,
         "split": split_manifest,
         "features": {
@@ -1076,9 +1088,12 @@ def prepare_dataset(
             "excluded_genes": "zero variance or wholly unobserved among VAE-training models",
             "dose_fit_rows": "train",
             "dose_transform": dose_transform.to_dict(),
-            "inhibition_definition": (
-                "1 - percent_control_viability / 100; no clipping; retain only inclusive "
-                f"quality range [{INHIBITION_QUALITY_MIN}, {INHIBITION_QUALITY_MAX}]"
+            "inhibition_definition": source_manifest.get(
+                "response_definition",
+                (
+                    "1 - percent_control_viability / 100; no clipping; retain only inclusive "
+                    f"quality range [{INHIBITION_QUALITY_MIN}, {INHIBITION_QUALITY_MAX}]"
+                ),
             ),
             "response_quality_control": response_quality_control(),
         },

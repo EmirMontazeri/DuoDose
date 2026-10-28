@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader
 from .assessment import target_window_mask
 from .config import ExperimentConfig
 from .data import DataBundle
+from .layout import DatasetPaths
 from .models import mixture_log_prob
 from .training import make_model
 from .utils import (
@@ -107,6 +108,11 @@ def evaluate(
     """Evaluate a fixed checkpoint and persist individual and grouped results."""
     if split not in {"validation", "test", "train"}:
         raise ValueError("Evaluation split must be train, validation, or test")
+    if (
+        bundle.manifest.get("dataset_name") is not None
+        and bundle.manifest["dataset_name"] != config.dataset_name
+    ):
+        raise ValueError("Evaluation configuration and prepared dataset names differ")
     guard_output(output_dir, Path(config.dataset_root))
     if output_dir.exists() and any(output_dir.iterdir()):
         raise FileExistsError(f"Evaluation output already exists: {output_dir}")
@@ -217,8 +223,12 @@ def evaluate(
     }
     from .assessment import enhanced_assessment
 
-    raw_available = "source_file" in results and all(
-        (Path(config.dataset_root) / name).is_file() for name in results.source_file.unique()
+    raw_available = "matrix_design.parquet" in bundle.manifest.get("artifacts", {}) or (
+        "source_file" in results
+        and all(
+            DatasetPaths(Path(config.dataset_root), config.dataset_name).source_path(name).is_file()
+            for name in results.source_file.unique()
+        )
     )
     assessment = enhanced_assessment(
         bundle,

@@ -253,6 +253,23 @@ def matrix_design(
     not surviving response coordinates, define selection candidates.
     """
     source = read_json(bundle.path / "source_manifest.json")
+    if "matrix_design.parquet" in source.get("output_hashes", {}):
+        from .screens import DESIGN_COLUMNS
+
+        path = bundle.path / "matrix_design.parquet"
+        if sha256_file(path) != source["output_hashes"][path.name]:
+            raise ValueError("Matrix design artifact integrity mismatch")
+        design = pd.read_parquet(path)
+        if set(design) != set(DESIGN_COLUMNS) or design.observation_id.duplicated().any():
+            raise ValueError("Matrix design must contain unique response-blind coordinates")
+        selected = bundle.observations.loc[bundle.observations.split.eq(split)]
+        design = design.loc[design.matrix_id.isin(selected.matrix_id.unique())].copy()
+        if not set(selected.observation_id).issubset(set(design.observation_id)):
+            raise ValueError("Matrix design does not cover the requested split observations")
+        numeric = design[["dose_a_um", "dose_b_um"]].to_numpy(dtype=float)
+        if not np.isfinite(numeric).all() or (numeric < 0).any():
+            raise ValueError("Matrix design doses must be finite and nonnegative")
+        return design.reset_index(drop=True)
     paths = DatasetPaths(dataset_root, dataset_name)
     hashes = {entry["path"]: entry["sha256"] for entry in source["raw_files"]}
     rows = []

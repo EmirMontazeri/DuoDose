@@ -208,6 +208,16 @@ def train_stage(
     if stage not in {"vae", "model"}:
         raise ValueError("Unknown training stage")
     guard_output(run_dir, Path(config.dataset_root))
+    if (
+        bundle.manifest.get("dataset_name") is not None
+        and bundle.manifest["dataset_name"] != config.dataset_name
+    ):
+        raise ValueError("Training configuration and prepared dataset names differ")
+    if (
+        bundle.manifest.get("sources") is not None
+        and bundle.manifest["sources"] != config.sources.sources
+    ):
+        raise ValueError("Training configuration and prepared response sources differ")
     if stop_after_steps is not None and stop_after_steps < 1:
         raise ValueError("stop_after_steps must be positive")
     settings = config.vae_training if stage == "vae" else config.training

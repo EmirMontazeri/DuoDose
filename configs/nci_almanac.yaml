@@ -1,0 +1,71 @@
+# Independent NCI-ALMANAC training; response datasets are never pooled.
+# CMP is an explicit shared expression reference, with fitting performed per run.
+dataset_root: dataset
+dataset_name: NCI-ALMANAC
+seed: 42
+device: cpu
+deterministic: true
+threads: 4
+sources:
+  sources:
+  - nci_almanac
+  fingerprint_bits: 2048
+  fingerprint_radius: 2
+  include_zero_doses: false
+  unsupported_drug_policy: exclude
+  unresolved_cell_policy: exclude
+  missing_response_policy: exclude
+  resolve_pubchem: true
+  pubchem_timeout_seconds: 30
+  pubchem_retries: 3
+  aliases: {}
+  max_matrices: null
+  workers: 4
+  nci_response: percent_control
+  nci_missing_no_tz: reconstruct
+split:
+  protocol: cell
+  seed: 42
+  validation_fraction: 0.15
+  test_fraction: 0.15
+  vae_validation_fraction: 0.15
+features:
+  n_genes: 2000
+  dose_reference_um: 1.0
+vae:
+  hidden_dims:
+  - 512
+  - 256
+  latent_dim: 32
+vae_beta: 1.0
+model:
+  encoder_dim: 64
+  encoder_hidden_dim: 128
+  mf_dim: 32
+  deep_hidden_dims:
+  - 256
+  - 128
+  deep_dim: 128
+  mixture_components: 5
+  min_sigma: 0.0001
+  rho_epsilon: 1.0e-05
+vae_training:
+  epochs: 200
+  batch_size: 16
+  weight_decay: 0.0
+training:
+  epochs: 100
+  batch_size: 256
+  weight_decay: 0.001
+  early_stopping_patience: 8
+evaluation:
+  batch_size: 1024
+  target_inhibition: 0.5
+  target_tolerance: 0.05
+  inhibition_bin_edges:
+  - 0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1
+cell_reference_dataset: AstraZeneca–DREAM
