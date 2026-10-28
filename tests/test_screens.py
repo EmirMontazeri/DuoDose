@@ -17,7 +17,7 @@ from rdkit import Chem
 from reverse_dose.assessment import matrix_design
 from reverse_dose.cli import artifact_paths, run
 from reverse_dose.config import config_from_dict, load_config
-from reverse_dose.data import DataBundle
+from reverse_dose.data import DataBundle, DoseTransform, ExpressionTransform
 from reverse_dose.downloads import fetch_file, select_pubchem_cid, verify_downloads
 from reverse_dose.layout import DatasetPaths
 from reverse_dose.preprocess import preprocess_sources
@@ -370,6 +370,79 @@ def test_full_design_keeps_missing_and_qc_excluded_coordinates(tmp_path: Path) -
         expected = f"{point.matrix_id}:{point.grid_row}:{point.grid_col}"
         assert expected in set(design.observation_id)
         assert expected not in set(rows.observation_id)
+
+
+def test_external_evaluation_reuses_training_state_and_reports_exposure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from reverse_dose.transfer import ExternalBundle, evaluate_external
+
+    root = tmp_path / "dataset"
+    _references(root)
+    _, sources = _almanac(root)
+    values = {
+        "dataset_root": str(root),
+        "dataset_name": "NCI-ALMANAC",
+        "cell_reference_dataset": "Reference",
+        "sources": sources,
+        "features": {"n_genes": 8},
+        "threads": 1,
+        "vae": {"hidden_dims": [8], "latent_dim": 3},
+        "model": {
+            "encoder_dim": 4,
+            "encoder_hidden_dim": 8,
+            "mf_dim": 2,
+            "deep_hidden_dims": [8],
+            "deep_dim": 8,
+            "mixture_components": 2,
+        },
+        "vae_training": {"epochs": 1, "batch_size": 16},
+        "training": {"epochs": 1, "batch_size": 64},
+        "evaluation": {"bootstrap_repetitions": 100},
+    }
+    config = config_from_dict(values)
+    result = run(config, tmp_path / "trained")
+    training = DataBundle(Path(result["data_dir"]))
+    from reverse_dose.training import train_stage
+
+    wrong = config_from_dict(config.to_dict())
+    wrong.dataset_name = "Wrong Dataset"
+    with pytest.raises(ValueError, match="dataset names differ"):
+        train_stage(training, wrong, tmp_path / "wrong_run", "vae")
+    assert not (tmp_path / "wrong_run").exists()
+    checkpoint = Path(result["model_checkpoint"])
+    before = sha256_file(checkpoint)
+    _, target_sources = _oneil(root)
+    target_config = config_from_dict(
+        {**values, "dataset_name": "ONeil-Merck", "sources": target_sources}
+    )
+
+    def forbidden_fit(*args, **kwargs):
+        raise AssertionError("External evaluation must never fit expression or dose state")
+
+    monkeypatch.setattr(ExpressionTransform, "fit", forbidden_fit)
+    monkeypatch.setattr(DoseTransform, "fit", forbidden_fit)
+    report = evaluate_external(training.path, checkpoint, target_config, tmp_path / "external")
+    assert report["generalization"].startswith("external-screen")
+    assert report["external_protocol"]["target_cells_seen_in_supervised_training"] == 4
+    assert report["external_protocol"]["target_cells"] == 6
+    assert sha256_file(checkpoint) == before
+    assert report["dataset_fingerprint"] != training.manifest["fingerprint"]
+    source, expression, _ = artifact_paths(target_config)
+    target = ExternalBundle(training, source, expression, checkpoint, "unseen_supervised")
+    assert len(target.cell_ids) == 2
+    assert not target.observations.seen_in_supervised_training.any()
+    assert target.dose_transform is training.dose_transform
+    assert target.expression_transform is training.expression_transform
+    assert set(target.drug_ids) == {"A", "B"}
+    assert not artifact_paths(target_config)[2].exists()
+    manifest_path = source / "source_manifest.json"
+    native = json.loads(manifest_path.read_text())
+    native["fingerprint_definition"]["radius"] += 1
+    atomic_json(manifest_path, native)
+    with pytest.raises(ValueError, match="fingerprint definitions differ"):
+        ExternalBundle(training, source, expression, checkpoint)
 
 
 def test_official_downloads_refuse_overwrites_and_tampering(tmp_path: Path) -> None:

@@ -104,12 +104,15 @@ def evaluate(
     checkpoint: Path,
     output_dir: Path,
     split: str = "test",
+    *,
+    reference_bundle: DataBundle | None = None,
 ) -> dict[str, Any]:
     """Evaluate a fixed checkpoint and persist individual and grouped results."""
     if split not in {"validation", "test", "train"}:
         raise ValueError("Evaluation split must be train, validation, or test")
     if (
-        bundle.manifest.get("dataset_name") is not None
+        reference_bundle is None
+        and bundle.manifest.get("dataset_name") is not None
         and bundle.manifest["dataset_name"] != config.dataset_name
     ):
         raise ValueError("Evaluation configuration and prepared dataset names differ")
@@ -118,7 +121,13 @@ def evaluate(
         raise FileExistsError(f"Evaluation output already exists: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
     device = resolve_device(config.device)
-    model = load_trained_model(bundle, config, checkpoint, config.device)
+    if reference_bundle is not None:
+        if (
+            bundle.manifest.get("external_protocol", {}).get("training_dataset_fingerprint")
+            != reference_bundle.manifest["fingerprint"]
+        ):
+            raise ValueError("External evaluation does not declare the verified training dataset")
+    model = load_trained_model(reference_bundle or bundle, config, checkpoint, config.device)
     dataset = bundle.dataset(split)
     if len(dataset) == 0:
         raise ValueError(f"Empty evaluation split: {split}")
@@ -222,6 +231,9 @@ def evaluate(
         ],
     }
     from .assessment import enhanced_assessment
+
+    if reference_bundle is not None:
+        report["external_protocol"] = dict(bundle.manifest["external_protocol"])
 
     raw_available = "matrix_design.parquet" in bundle.manifest.get("artifacts", {}) or (
         "source_file" in results

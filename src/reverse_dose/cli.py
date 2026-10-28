@@ -273,6 +273,20 @@ def build_parser() -> argparse.ArgumentParser:
     evaluation.add_argument("--checkpoint", type=Path, required=True)
     evaluation.add_argument("--output", type=Path, required=True)
     evaluation.add_argument("--split", choices=["train", "validation", "test"], default="test")
+    external = sub.add_parser(
+        "evaluate-external",
+        help="Evaluate another dataset using a fixed selected model and its saved feature transforms",
+    )
+    external.add_argument("--training-data-dir", type=Path, required=True)
+    external.add_argument("--checkpoint", type=Path, required=True)
+    external.add_argument("--target-config", type=Path, required=True)
+    external.add_argument("--target-source-dir", type=Path)
+    external.add_argument("--target-expression-dir", type=Path)
+    external.add_argument("--output", type=Path, required=True)
+    external.add_argument(
+        "--cell-scope", choices=["all", "unseen_supervised", "unseen_fitting"], default="all"
+    )
+    external.add_argument("--device", choices=["cpu", "cuda", "mps", "auto"])
     prediction = sub.add_parser(
         "predict", help="Predict dose distribution, candidates, samples and a 2D map"
     )
@@ -347,6 +361,23 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     setup_logging()
     try:
+        if args.command == "evaluate-external":
+            from .transfer import evaluate_external
+
+            target_config = load_config(args.target_config)
+            guard_output(args.output, Path(target_config.dataset_root))
+            setup_logging(args.output.parent / "external_evaluation_logs")
+            evaluate_external(
+                args.training_data_dir,
+                args.checkpoint,
+                target_config,
+                args.output,
+                source_dir=args.target_source_dir,
+                expression_dir=args.target_expression_dir,
+                cell_scope=args.cell_scope,
+                device=args.device,
+            )
+            return
         if args.command == "assess-suite":
             from .reporting import assess_suite
 

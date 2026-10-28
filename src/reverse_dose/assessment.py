@@ -491,9 +491,13 @@ def enhanced_assessment(
         "split": split,
         "protocol": protocol,
         "generalization": (
-            "cold-start unseen identities"
-            if protocol == "cell"
-            else "warm-completion held-out cell/pair groups"
+            "external-screen transfer; identity exposure declared separately"
+            if protocol == "external"
+            else (
+                "cold-start unseen identities"
+                if protocol == "cell"
+                else "warm-completion held-out cell/pair groups"
+            )
         ),
         "evaluation_settings": vars(config.evaluation),
         "primary": primary,
