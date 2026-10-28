@@ -17,7 +17,7 @@ Validates:
   9. Dose-response cell-label consistency
 
 Writes:
-    dataset/manifests/audit_report.json
+    dataset/manifests/AstraZeneca–DREAM/audit_report.json
 
 Usage:
     uv run python audit_dataset.py
@@ -54,6 +54,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+
+from reverse_dose.layout import DEFAULT_DATASET_NAME, DatasetPaths
 
 # =============================================================================
 # Configuration
@@ -451,13 +453,19 @@ def main() -> int:
         action="store_true",
         help=("Return exit code 2 when warnings exist."),
     )
+    parser.add_argument(
+        "--dataset-name",
+        default=DEFAULT_DATASET_NAME,
+        help="Dataset directory name within raw, processed, splits and manifests.",
+    )
 
     args = parser.parse_args()
 
     root = args.root.resolve()
 
     dataset = root / "dataset"
-    raw = dataset / "raw"
+    paths = DatasetPaths(dataset, args.dataset_name)
+    raw = paths.raw
 
     az = raw / "az_dream"
 
@@ -490,11 +498,11 @@ def main() -> int:
 
     required_paths = {
         "dataset.md": dataset / "dataset.md",
-        "processed/cell_expression": dataset / "processed" / "cell_expression",
-        "processed/drug_features": dataset / "processed" / "drug_features",
-        "processed/dose_response": dataset / "processed" / "dose_response",
-        "splits": dataset / "splits",
-        "manifests": dataset / "manifests",
+        "processed/cell_expression": paths.processed / "cell_expression",
+        "processed/drug_features": paths.processed / "drug_features",
+        "processed/dose_response": paths.processed / "dose_response",
+        "splits": paths.splits,
+        "manifests": paths.manifests,
         "AZ-DREAM": az,
         "corrected DREAM matrices": az / "DREAM_Challenge_matrices_corrected",
         "corrected OI matrices": az / "DREAM_OI_matrices_corrected",
@@ -552,6 +560,7 @@ def main() -> int:
         return finish(
             dataset,
             args.strict,
+            args.dataset_name,
         )
 
     # =========================================================================
@@ -1759,6 +1768,7 @@ def main() -> int:
     return finish(
         dataset,
         args.strict,
+        args.dataset_name,
     )
 
 
@@ -1770,6 +1780,7 @@ def main() -> int:
 def finish(
     dataset: Path,
     strict: bool,
+    dataset_name: str = DEFAULT_DATASET_NAME,
 ) -> int:
 
     heading("FINAL AUDIT SUMMARY")
@@ -1838,7 +1849,7 @@ def finish(
     # Machine-readable manifest
     # -------------------------------------------------------------------------
 
-    manifest_dir = dataset / "manifests"
+    manifest_dir = DatasetPaths(dataset, dataset_name).manifests
 
     try:
 

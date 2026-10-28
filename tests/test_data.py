@@ -137,7 +137,7 @@ def test_expression_transform_order_missing_and_serialization(tmp_path: Path) ->
 
 def test_streamed_expression_aggregation_and_raw_immutability(tmp_path: Path) -> None:
     dataset = tmp_path / "dataset"
-    raw_dir = dataset / "raw" / "cell_model_passports"
+    raw_dir = dataset / "raw" / "AstraZeneca–DREAM" / "cell_model_passports"
     raw_dir.mkdir(parents=True)
     archive = raw_dir / "rnaseq_all_test.zip"
     pd.DataFrame(

@@ -1,5 +1,6 @@
 # Training settings: see docs/design.md and docs/protocol.md.
 dataset_root: dataset
+dataset_name: AstraZeneca–DREAM
 seed: 42
 device: cpu
 deterministic: true

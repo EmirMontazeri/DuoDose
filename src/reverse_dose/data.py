@@ -27,6 +27,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from .layout import DEFAULT_DATASET_NAME, DatasetPaths
 from .preprocess import (
     INHIBITION_QUALITY_MAX,
     INHIBITION_QUALITY_MIN,
@@ -240,6 +241,8 @@ def extract_expression(
     cells: pd.DataFrame,
     output_dir: Path,
     chunk_size: int = 250_000,
+    *,
+    dataset_name: str = DEFAULT_DATASET_NAME,
 ) -> Path:
     """Stream and aggregate all released CMP cell-line RNA-seq model/gene values.
 
@@ -250,6 +253,7 @@ def extract_expression(
     Multiple source/dataset measurements are averaged without weighting.
     """
     dataset_root, output_dir = Path(dataset_root), Path(output_dir)
+    paths = DatasetPaths(dataset_root, dataset_name)
     _guard_output(output_dir, dataset_root)
     _require_columns(cells, {"cell_id", "model_id"}, "cells")
     _ids(cells["cell_id"].tolist(), "cell_id")
@@ -261,12 +265,12 @@ def extract_expression(
         or chunk_size < 1
     ):
         raise ValueError("Expression extraction requires mapped cells and a positive chunk_size")
-    archives = sorted((dataset_root / "raw" / "cell_model_passports").glob("rnaseq_all_*.zip"))
+    archives = sorted((paths.raw / "cell_model_passports").glob("rnaseq_all_*.zip"))
     if len(archives) != 1:
         raise ValueError(f"Expected exactly one rnaseq_all_*.zip, found {len(archives)}")
     archive = archives[0]
     source_sha256 = _digest(archive)
-    catalog_dir = dataset_root / "raw" / "cell_model_passports"
+    catalog_dir = paths.raw / "cell_model_passports"
     availability_path = _one_catalog(
         catalog_dir,
         "model_dataset_availability_*.csv",

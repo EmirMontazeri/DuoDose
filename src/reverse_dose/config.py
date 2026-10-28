@@ -11,6 +11,7 @@ from typing import Any, TypeVar, get_args, get_origin, get_type_hints
 import yaml
 
 from .models import ModelConfig, VAEConfig
+from .layout import DEFAULT_DATASET_NAME, DatasetPaths
 
 
 @dataclass
@@ -87,6 +88,7 @@ class ExperimentConfig:
     """Complete effective configuration persisted with all runs."""
 
     dataset_root: str = "dataset"
+    dataset_name: str = DEFAULT_DATASET_NAME
     seed: int = 42
     device: str = "cpu"
     deterministic: bool = True
@@ -121,6 +123,7 @@ class ExperimentConfig:
                 raise ValueError(f"{path} must be finite")
 
         finite(self.to_dict())
+        DatasetPaths(Path(self.dataset_root), self.dataset_name)
         if self.seed < 0 or self.threads < 1 or self.vae_beta <= 0:
             raise ValueError("seed >= 0, threads >= 1 and vae_beta > 0 required")
         if self.device not in {"auto", "cpu", "cuda", "mps"}:

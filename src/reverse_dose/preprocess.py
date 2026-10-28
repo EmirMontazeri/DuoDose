@@ -38,6 +38,8 @@ import pandas as pd
 from rdkit import Chem, DataStructs, rdBase
 from rdkit.Chem import rdFingerprintGenerator
 
+from .layout import DEFAULT_DATASET_NAME, DatasetPaths
+
 LOGGER = logging.getLogger(__name__)
 SCHEMA_VERSION = "source-v2.4"
 INHIBITION_QUALITY_MIN = -2.0
@@ -45,8 +47,8 @@ INHIBITION_QUALITY_MAX = 2.0
 INHIBITION_QUALITY_REASON = "response_outside_quality_range"
 CHEMISTRY_COLUMN = "SMILES or PubChem ID"
 SOURCE_DIRECTORIES = {
-    "dream": "raw/az_dream/DREAM_Challenge_matrices_corrected",
-    "oi": "raw/az_dream/DREAM_OI_matrices_corrected",
+    "dream": "az_dream/DREAM_Challenge_matrices_corrected",
+    "oi": "az_dream/DREAM_OI_matrices_corrected",
 }
 KNOWN_BIOLOGICS = {
     "ADAM17": "MEDI3622; monoclonal antibody",
@@ -165,6 +167,8 @@ def _required_columns(frame: pd.DataFrame, columns: Iterable[str], source: Path)
 def map_cells(
     dataset_root: Path,
     aliases: dict[str, dict[str, str]] | None = None,
+    *,
+    dataset_name: str = DEFAULT_DATASET_NAME,
 ) -> tuple[pd.DataFrame, dict[str, str], dict[str, Any]]:
     """Map DREAM cells to CMP by exact unique COSMIC identifiers.
 
@@ -173,8 +177,9 @@ def map_cells(
     Ambiguous source names and conflicting aliases raise instead of guessing.
     """
     dataset_root = Path(dataset_root)
-    dream_path = dataset_root / "raw/az_dream_molecular/cell_info.csv"
-    cmp_paths = sorted((dataset_root / "raw/cell_model_passports").glob("model_list_*.csv"))
+    paths = DatasetPaths(dataset_root, dataset_name)
+    dream_path = paths.raw / "az_dream_molecular/cell_info.csv"
+    cmp_paths = sorted((paths.raw / "cell_model_passports").glob("model_list_*.csv"))
     if len(cmp_paths) != 1:
         raise ValueError(f"Expected one immutable CMP model_list release, found {cmp_paths}")
     cmp_path = cmp_paths[0]
@@ -440,6 +445,7 @@ def build_drug_features(
     bits: int,
     radius: int,
     *,
+    dataset_name: str = DEFAULT_DATASET_NAME,
     resolve_pubchem: bool = False,
     pubchem_timeout_seconds: int = 30,
     pubchem_retries: int = 3,
@@ -450,10 +456,12 @@ def build_drug_features(
     remote identifier resolution. The returned source list includes any verified
     PubChem cache artifacts consumed alongside the immutable chemistry releases.
     """
-    primary_path = dataset_root / "raw/az_dream/Drug_info_release.csv"
+    dataset_root = Path(dataset_root)
+    paths = DatasetPaths(dataset_root, dataset_name)
+    primary_path = paths.raw / "az_dream/Drug_info_release.csv"
     supplement_path = (
-        dataset_root
-        / "raw/az_dream/Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx"
+        paths.raw
+        / "az_dream/Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx"
     )
     primary = pd.read_csv(primary_path, dtype=str)
     with warnings.catch_warnings():
@@ -505,7 +513,7 @@ def build_drug_features(
                 pubchem_cid = int(values[cid_source].removesuffix(".0"))
                 canonical, pubchem_manifest, cache_paths = resolve_pubchem_cid(
                     pubchem_cid,
-                    dataset_root / "processed/drug_features/pubchem/v1",
+                    paths.processed / "drug_features/pubchem/v1",
                     timeout_seconds=pubchem_timeout_seconds,
                     retries=pubchem_retries,
                 )
@@ -546,7 +554,9 @@ def build_drug_features(
             ),
             "pubchem_request_url": (pubchem_manifest["url"] if pubchem_manifest else None),
             "pubchem_cache_manifest": (
-                f"processed/drug_features/pubchem/v1/{pubchem_cid}/manifest.json"
+                (paths.processed / f"drug_features/pubchem/v1/{pubchem_cid}/manifest.json")
+                .relative_to(dataset_root)
+                .as_posix()
                 if pubchem_manifest
                 else None
             ),
@@ -758,7 +768,11 @@ def _safe_output(dataset_root: Path, output_dir: Path) -> None:
 
 
 def preprocess_sources(
-    dataset_root: Path, config: dict[str, Any], output_dir: Path
+    dataset_root: Path,
+    config: dict[str, Any],
+    output_dir: Path,
+    *,
+    dataset_name: str = DEFAULT_DATASET_NAME,
 ) -> dict[str, Any]:
     """Build source tables and fingerprints atomically, returning their manifest.
 
@@ -769,13 +783,14 @@ def preprocess_sources(
     checks; complete experiments must use null.
     """
     dataset_root, output_dir = Path(dataset_root).resolve(), Path(output_dir).resolve()
+    layout = DatasetPaths(dataset_root, dataset_name)
     _safe_output(dataset_root, output_dir)
     effective = _effective_config(config)
     LOGGER.info("Inspecting corrected dose matrices: sources=%s", effective["sources"])
     paths: list[tuple[str, Path]] = []
     source_counts = {}
     for source in effective["sources"]:
-        selected_paths = sorted((dataset_root / SOURCE_DIRECTORIES[source]).rglob("*.xlsx"))
+        selected_paths = sorted((layout.raw / SOURCE_DIRECTORIES[source]).rglob("*.xlsx"))
         if not selected_paths:
             raise ValueError(f"No corrected {source} XLSX matrices found")
         source_counts[source] = len(selected_paths)
@@ -794,11 +809,14 @@ def preprocess_sources(
             len(paths),
             sum(source_counts.values()),
         )
-    cells, names, cell_provenance = map_cells(dataset_root, effective["aliases"])
+    cells, names, cell_provenance = map_cells(
+        dataset_root, effective["aliases"], dataset_name=dataset_name
+    )
     drugs, drug_ids, drug_features, chemistry_sources = build_drug_features(
         dataset_root,
         effective["fingerprint_bits"],
         effective["fingerprint_radius"],
+        dataset_name=dataset_name,
         resolve_pubchem=effective["resolve_pubchem"],
         pubchem_timeout_seconds=effective["pubchem_timeout_seconds"],
         pubchem_retries=effective["pubchem_retries"],
@@ -809,7 +827,9 @@ def preprocess_sources(
                 *(str(path.relative_to(dataset_root)) for _, path in paths),
                 *cell_provenance["source_files"],
                 *chemistry_sources,
-                "raw/az_dream/Combenefit_dose_response_fitting_code.txt",
+                (layout.raw / "az_dream/Combenefit_dose_response_fitting_code.txt")
+                .relative_to(dataset_root)
+                .as_posix(),
             ]
         )
     )
@@ -894,7 +914,12 @@ def preprocess_sources(
             known_names["gemcitibine"] = "Gemcitabine"
             drug_alias_evidence["Gemcitibine"] = {
                 "drug_id": "Gemcitabine",
-                "source": "raw/az_dream/Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx",
+                "source": (
+                    layout.raw
+                    / "az_dream/Extra DrugChemistryData to release for Nat Comms FINAL RELEASE_200219.xlsx"
+                )
+                .relative_to(dataset_root)
+                .as_posix(),
                 "sheet": "Drug_Chemistry_Data",
                 "column": "Drug name",
                 "released_value": drug_name,
@@ -1098,7 +1123,12 @@ def preprocess_sources(
             "inhibition = 1 - percent_control_viability / 100; no clipping; "
             "retain only inclusive quality range [-2.0, 2.0]"
         ),
-        "response_source_evidence": "raw/az_dream/Combenefit_dose_response_fitting_code.txt fixes EC0=100.0",
+        "response_source_evidence": (
+            (layout.raw / "az_dream/Combenefit_dose_response_fitting_code.txt")
+            .relative_to(dataset_root)
+            .as_posix()
+            + " fixes EC0=100.0"
+        ),
         "dose_unit": "uM",
         "dose_order": "case-sensitive lexicographic canonical drug IDs; doses moved together",
         "fingerprint_definition": {

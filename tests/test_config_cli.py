@@ -8,6 +8,7 @@ import pytest
 
 from reverse_dose.cli import artifact_paths, build_parser, main
 from reverse_dose.config import config_from_dict, load_config
+from reverse_dose.layout import DEFAULT_DATASET_NAME, DatasetPaths
 from reverse_dose.utils import guard_output
 
 
@@ -29,6 +30,10 @@ from reverse_dose.utils import guard_output
         {"model": {"deep_dim": 3}},
         {"vae": {"hidden_dims": "512,256"}},
         {"evaluation": {"inhibition_bin_edges": [1, 0]}},
+        {"dataset_name": ""},
+        {"dataset_name": "../another"},
+        {"dataset_name": "/absolute"},
+        {"dataset_name": "nested\\dataset"},
     ],
 )
 def test_invalid_configuration_is_rejected(values: dict) -> None:
@@ -85,6 +90,21 @@ def test_all_cli_help_is_discoverable(capsys: pytest.CaptureFixture[str]) -> Non
     assert parsed.inhibition == 0.5
 
 
+def test_artifact_paths_are_isolated_by_dataset(tmp_path: Path) -> None:
+    config = config_from_dict({"dataset_root": str(tmp_path)})
+    source, expression, prepared = artifact_paths(config)
+    paths = DatasetPaths(tmp_path)
+    assert source.parent == paths.processed / "dose_response"
+    assert expression.parent == paths.processed / "cell_expression"
+    assert prepared.parent == paths.splits
+    config.dataset_name = "Another Dataset"
+    other = artifact_paths(config)
+    for original, changed in zip((source, expression, prepared), other):
+        assert DEFAULT_DATASET_NAME in original.parts
+        assert "Another Dataset" in changed.parts
+        assert original != changed
+
+
 def test_raw_output_guard_resolves_symlinks(tmp_path: Path) -> None:
     root = tmp_path / "dataset"
     raw = root / "raw"
@@ -93,6 +113,10 @@ def test_raw_output_guard_resolves_symlinks(tmp_path: Path) -> None:
     alias.symlink_to(raw, target_is_directory=True)
     with pytest.raises(ValueError, match="immutable raw"):
         guard_output(alias / "artifact.json", root)
+    with pytest.raises(ValueError, match="immutable raw"):
+        guard_output(DatasetPaths(root).raw / "artifact.json", root)
+    with pytest.raises(ValueError, match="immutable raw"):
+        guard_output(DatasetPaths(root, "Another Dataset").raw / "artifact.json", root)
     guard_output(root / "processed" / "safe", root)
 
 

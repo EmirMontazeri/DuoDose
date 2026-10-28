@@ -1,5 +1,6 @@
 # Real-source integration check. This is not a scientific performance experiment.
 dataset_root: dataset
+dataset_name: AstraZeneca–DREAM
 seed: 7
 device: cpu
 threads: 4

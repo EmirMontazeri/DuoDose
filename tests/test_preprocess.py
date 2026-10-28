@@ -27,6 +27,7 @@ from reverse_dose.preprocess import (
     resolve_smiles,
     response_quality_control,
 )
+from reverse_dose.layout import DatasetPaths
 
 
 def write_matrix(
@@ -69,9 +70,9 @@ def write_matrix(
 @pytest.fixture
 def raw_dataset(tmp_path: Path) -> Path:
     root = tmp_path / "dataset"
-    az = root / "raw/az_dream"
-    molecular = root / "raw/az_dream_molecular"
-    cmp = root / "raw/cell_model_passports"
+    az = root / "raw/AstraZeneca–DREAM/az_dream"
+    molecular = root / "raw/AstraZeneca–DREAM/az_dream_molecular"
+    cmp = root / "raw/AstraZeneca–DREAM/cell_model_passports"
     for directory in [az, molecular, cmp]:
         directory.mkdir(parents=True)
     pd.DataFrame(
@@ -171,7 +172,7 @@ def test_atomic_preprocessing_orientation_cache_and_raw_integrity(
         for path in (raw_dataset / "raw").rglob("*")
         if path.is_file()
     }
-    destination = raw_dataset / "processed/source"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/source"
     config = {"workers": 1, "fingerprint_bits": 32}
     manifest = preprocess_sources(raw_dataset, config, destination)
     frame = pd.read_parquet(destination / "observations.parquet")
@@ -198,6 +199,25 @@ def test_atomic_preprocessing_orientation_cache_and_raw_integrity(
         preprocess_sources(raw_dataset, config, destination)
 
 
+def test_preprocessing_uses_only_the_selected_dataset(raw_dataset: Path) -> None:
+    original = DatasetPaths(raw_dataset)
+    selected = DatasetPaths(raw_dataset, "Another Dataset")
+    original.raw.rename(selected.raw)
+    output = selected.processed / "source"
+    manifest = preprocess_sources(
+        raw_dataset,
+        {"workers": 1, "resolve_pubchem": False},
+        output,
+        dataset_name=selected.name,
+    )
+    assert manifest["raw_files"]
+    for entry in manifest["raw_files"]:
+        assert entry["path"].startswith("raw/Another Dataset/")
+        assert (raw_dataset / entry["path"]).is_file()
+    with pytest.raises(ValueError, match="No corrected dream"):
+        preprocess_sources(raw_dataset, {"workers": 1}, original.processed / "source")
+
+
 def test_source_cell_alias_requires_evidence(raw_dataset: Path) -> None:
     cells, names, provenance = map_cells(raw_dataset)
     assert cells.iloc[0].model_id == "SIDM0001"
@@ -215,10 +235,11 @@ def test_source_cell_alias_requires_evidence(raw_dataset: Path) -> None:
 
 def test_unresolved_and_conflicting_cells_quarantined(raw_dataset: Path) -> None:
     write_matrix(
-        raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
+        raw_dataset
+        / "raw/AstraZeneca–DREAM/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
         title="Cell1C",
     )
-    destination = raw_dataset / "processed/quarantine"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/quarantine"
     manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
     assert manifest["counts"]["retained_matrices"] == 1
     exclusions = pd.read_parquet(destination / "exclusions.parquet")
@@ -228,16 +249,17 @@ def test_unresolved_and_conflicting_cells_quarantined(raw_dataset: Path) -> None
         preprocess_sources(
             raw_dataset,
             {"workers": 1, "unresolved_cell_policy": "error"},
-            raw_dataset / "processed/error",
+            raw_dataset / "processed/AstraZeneca–DREAM/error",
         )
 
 
 def test_missing_and_zero_doses_generate_explicit_exclusions(raw_dataset: Path) -> None:
     write_matrix(
-        raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
+        raw_dataset
+        / "raw/AstraZeneca–DREAM/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp2.xlsx",
         response=None,
     )
-    destination = raw_dataset / "processed/no_zeros"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/no_zeros"
     manifest = preprocess_sources(
         raw_dataset, {"workers": 1, "include_zero_doses": False}, destination
     )
@@ -250,17 +272,17 @@ def test_missing_and_zero_doses_generate_explicit_exclusions(raw_dataset: Path) 
         preprocess_sources(
             raw_dataset,
             {"workers": 1, "missing_response_policy": "error"},
-            raw_dataset / "processed/missing_error",
+            raw_dataset / "processed/AstraZeneca–DREAM/missing_error",
         )
 
 
 def test_raw_output_protection(raw_dataset: Path) -> None:
     with pytest.raises(ValueError, match="immutable"):
-        preprocess_sources(raw_dataset, {}, raw_dataset / "raw/generated")
+        preprocess_sources(raw_dataset, {}, raw_dataset / "raw/AstraZeneca–DREAM/generated")
 
 
 def test_duplicate_cosmic_mappings_fail(raw_dataset: Path) -> None:
-    path = raw_dataset / "raw/cell_model_passports/model_list_20260101.csv"
+    path = raw_dataset / "raw/AstraZeneca–DREAM/cell_model_passports/model_list_20260101.csv"
     pd.DataFrame({"model_id": ["SIDM1", "SIDM2"], "COSMIC_ID": [123, 123]}).to_csv(
         path, index=False
     )
@@ -272,10 +294,11 @@ def test_response_outside_unit_interval_but_inside_quality_range_is_not_clipped(
     raw_dataset: Path,
 ) -> None:
     write_matrix(
-        raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx",
+        raw_dataset
+        / "raw/AstraZeneca–DREAM/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx",
         response=130,
     )
-    destination = raw_dataset / "processed/out_of_range"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/out_of_range"
     manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
     assert manifest["counts"]["retained_observations_outside_unit_interval"] == 1
     assert pd.read_parquet(destination / "observations.parquet").inhibition.min() == pytest.approx(
@@ -293,9 +316,12 @@ def test_response_outside_unit_interval_but_inside_quality_range_is_not_clipped(
 def test_inhibition_quality_boundaries_are_inclusive(
     raw_dataset: Path, response: float, expected_inhibition: float
 ) -> None:
-    path = raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx"
+    path = (
+        raw_dataset
+        / "raw/AstraZeneca–DREAM/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx"
+    )
     write_matrix(path, response=response)
-    destination = raw_dataset / "processed/quality_boundary"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/quality_boundary"
     manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
     observations = pd.read_parquet(destination / "observations.parquet")
 
@@ -311,9 +337,12 @@ def test_inhibition_quality_boundaries_are_inclusive(
 def test_inhibition_outside_quality_range_is_removed_and_preserved(
     raw_dataset: Path, response: float, expected_inhibition: float
 ) -> None:
-    path = raw_dataset / "raw/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx"
+    path = (
+        raw_dataset
+        / "raw/AstraZeneca–DREAM/az_dream/DREAM_Challenge_matrices_corrected/A&B&Cell1&Exp1.xlsx"
+    )
     write_matrix(path, response=response)
-    destination = raw_dataset / "processed/quality_exclusion"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/quality_exclusion"
     manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
     observations = pd.read_parquet(destination / "observations.parquet")
     exclusions = pd.read_parquet(destination / "exclusions.parquet")
@@ -377,7 +406,7 @@ def test_pubchem_rejects_wrong_cid_and_never_commits(
 def test_pubchem_release_precedence_and_explicit_offline_mode(
     raw_dataset: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    primary_path = raw_dataset / "raw/az_dream/Drug_info_release.csv"
+    primary_path = raw_dataset / "raw/AstraZeneca–DREAM/az_dream/Drug_info_release.csv"
     drugs = pd.read_csv(primary_path)
     drugs.loc[drugs.ChallengeName == "Unsupported", "SMILES or PubChem ID"] = "702"
     drugs.to_csv(primary_path, index=False)
@@ -397,12 +426,16 @@ def test_pubchem_release_precedence_and_explicit_offline_mode(
     assert row.pubchem_cid == 702
     assert row.structure_status == "resolved_exact_released_pubchem_cid"
     assert any(path.endswith("702/response.json") for path in paths)
+    assert row.pubchem_cache_manifest == (
+        "processed/AstraZeneca–DREAM/drug_features/pubchem/v1/702/manifest.json"
+    )
+    assert (raw_dataset / row.pubchem_cache_manifest).is_file()
 
 
 def test_released_gemcitibine_alias_has_exact_recorded_evidence(
     raw_dataset: Path,
 ) -> None:
-    az = raw_dataset / "raw/az_dream"
+    az = raw_dataset / "raw/AstraZeneca–DREAM/az_dream"
     primary_path = az / "Drug_info_release.csv"
     frame = pd.read_csv(primary_path)
     frame.loc[frame.ChallengeName == "B", "ChallengeName"] = "Gemcitabine"
@@ -419,7 +452,7 @@ def test_released_gemcitibine_alias_has_exact_recorded_evidence(
     path = old.with_name("A&Gemcitabine&Cell1&Exp1.xlsx")
     workbook.save(path)
     old.unlink()
-    destination = raw_dataset / "processed/alias"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/alias"
     manifest = preprocess_sources(raw_dataset, {"workers": 1}, destination)
     assert manifest["drug_alias_evidence"]["Gemcitibine"]["drug_id"] == "Gemcitabine"
     frame = pd.read_parquet(destination / "observations.parquet")
@@ -428,8 +461,8 @@ def test_released_gemcitibine_alias_has_exact_recorded_evidence(
 
 
 def test_source_regeneration_is_byte_reproducible(raw_dataset: Path) -> None:
-    first = raw_dataset / "processed/first"
-    second = raw_dataset / "processed/second"
+    first = raw_dataset / "processed/AstraZeneca–DREAM/first"
+    second = raw_dataset / "processed/AstraZeneca–DREAM/second"
     a = preprocess_sources(raw_dataset, {"workers": 1}, first)
     b = preprocess_sources(raw_dataset, {"workers": 1}, second)
     assert a == b
@@ -439,7 +472,7 @@ def test_source_regeneration_is_byte_reproducible(raw_dataset: Path) -> None:
 
 
 def test_entire_missing_oi_grid_is_explicitly_excluded(raw_dataset: Path) -> None:
-    oi_dir = raw_dataset / "raw/az_dream/DREAM_OI_matrices_corrected"
+    oi_dir = raw_dataset / "raw/AstraZeneca–DREAM/az_dream/DREAM_OI_matrices_corrected"
     valid_path = oi_dir / "A&B&Cell1&Exp1.xlsx"
     missing_path = oi_dir / "A&B&Cell1&Exp2.xlsx"
     write_matrix(valid_path)
@@ -452,7 +485,7 @@ def test_entire_missing_oi_grid_is_explicitly_excluded(raw_dataset: Path) -> Non
     parsed = parse_corrected_matrix(missing_path)
     assert parsed["points"] == []
     assert parsed["missing_points"] == [(1, 1), (1, 2), (2, 1), (2, 2)]
-    destination = raw_dataset / "processed/oi"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/oi"
     manifest = preprocess_sources(raw_dataset, {"workers": 1, "sources": ["oi"]}, destination)
     assert manifest["counts"]["parsed_matrices"] == 2
     assert manifest["counts"]["retained_matrices"] == 1
@@ -467,14 +500,14 @@ def test_entire_missing_oi_grid_is_explicitly_excluded(raw_dataset: Path) -> Non
         preprocess_sources(
             raw_dataset,
             {"workers": 1, "sources": ["oi"], "missing_response_policy": "error"},
-            raw_dataset / "processed/oi_error",
+            raw_dataset / "processed/AstraZeneca–DREAM/oi_error",
         )
 
 
 def test_source_manifest_integrity_and_complete_output_inventory(
     raw_dataset: Path,
 ) -> None:
-    destination = raw_dataset / "processed/integrity"
+    destination = raw_dataset / "processed/AstraZeneca–DREAM/integrity"
     preprocess_sources(raw_dataset, {"workers": 1}, destination)
     path = destination / "source_manifest.json"
     original = path.read_text()

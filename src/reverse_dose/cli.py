@@ -25,6 +25,7 @@ from .data import (
 )
 from .evaluation import evaluate
 from .inference import Predictor, export_model, write_prediction
+from .layout import DatasetPaths
 from .preprocess import SCHEMA_VERSION as SOURCE_SCHEMA_VERSION, map_cells, preprocess_sources
 from .training import train_stage
 from .utils import (
@@ -42,15 +43,15 @@ LOGGER = logging.getLogger(__name__)
 
 def artifact_paths(config: ExperimentConfig) -> tuple[Path, Path, Path]:
     """Compute stable configuration-specific source and prepared paths."""
-    root = Path(config.dataset_root)
+    paths = DatasetPaths(Path(config.dataset_root), config.dataset_name)
     source_key = fingerprint({"sources": asdict(config.sources), "schema": SOURCE_SCHEMA_VERSION})[
         :12
     ]
-    source = root / "processed" / "dose_response" / f"source_{source_key}"
+    source = paths.processed / "dose_response" / f"source_{source_key}"
     expression_key = fingerprint(
         {"population": EXPRESSION_POPULATION, "schema": DATA_SCHEMA_VERSION}
     )[:12]
-    expression = root / "processed" / "cell_expression" / f"expression_{expression_key}"
+    expression = paths.processed / "cell_expression" / f"expression_{expression_key}"
     split_key = fingerprint(
         {
             "source": source_key,
@@ -60,7 +61,7 @@ def artifact_paths(config: ExperimentConfig) -> tuple[Path, Path, Path]:
             "expression": expression_key,
         }
     )[:12]
-    prepared = root / "splits" / f"split_{split_key}"
+    prepared = paths.splits / f"split_{split_key}"
     return source, expression, prepared
 
 
@@ -85,9 +86,16 @@ def prepare(
         expression_dir,
         data_dir,
     )
-    preprocess_sources(Path(config.dataset_root), asdict(config.sources), source_dir)
+    preprocess_sources(
+        Path(config.dataset_root),
+        asdict(config.sources),
+        source_dir,
+        dataset_name=config.dataset_name,
+    )
     cells = pd.read_parquet(source_dir / "cells.parquet")
-    extract_expression(Path(config.dataset_root), cells, expression_dir)
+    extract_expression(
+        Path(config.dataset_root), cells, expression_dir, dataset_name=config.dataset_name
+    )
     prepare_dataset(
         source_dir,
         expression_dir,
@@ -358,14 +366,17 @@ def main(argv: list[str] | None = None) -> None:
             export_model(args.data_dir, args.checkpoint, args.output, dataset_root)
             return
         config = load_config(args.config)
+        paths = DatasetPaths(Path(config.dataset_root), config.dataset_name)
         for name in ("output", "run_dir", "source_dir", "expression_dir", "data_dir"):
             path = getattr(args, name, None)
             if path is not None:
                 guard_output(path, Path(config.dataset_root))
         if args.command == "inspect":
             root = Path(config.dataset_root)
-            audit = read_json(root / "manifests" / "audit_report.json")
-            cells, _, mapping = map_cells(root, config.sources.aliases)
+            audit = read_json(paths.manifests / "audit_report.json")
+            cells, _, mapping = map_cells(
+                root, config.sources.aliases, dataset_name=config.dataset_name
+            )
             payload = {
                 "audit": audit,
                 "environment": environment_info(),
@@ -373,7 +384,7 @@ def main(argv: list[str] | None = None) -> None:
                 "cell_mapping": mapping,
                 "configuration": config.to_dict(),
             }
-            output = root / "manifests" / "inspection.json"
+            output = paths.manifests / "inspection.json"
             atomic_json(output, payload)
             LOGGER.info(
                 "Audit=%s, uniquely mapped cells=%d, runtime=%s; wrote %s",
@@ -384,18 +395,26 @@ def main(argv: list[str] | None = None) -> None:
             )
         elif args.command == "preprocess":
             source = args.source_dir or artifact_paths(config)[0]
-            setup_logging(Path(config.dataset_root) / "manifests" / "logs")
-            preprocess_sources(Path(config.dataset_root), asdict(config.sources), source)
+            setup_logging(paths.manifests / "logs")
+            preprocess_sources(
+                Path(config.dataset_root),
+                asdict(config.sources),
+                source,
+                dataset_name=config.dataset_name,
+            )
         elif args.command == "extract-expression":
-            cells, _, _ = map_cells(Path(config.dataset_root), config.sources.aliases)
-            setup_logging(Path(config.dataset_root) / "manifests" / "logs")
+            cells, _, _ = map_cells(
+                Path(config.dataset_root), config.sources.aliases, dataset_name=config.dataset_name
+            )
+            setup_logging(paths.manifests / "logs")
             extract_expression(
                 Path(config.dataset_root),
                 cells,
                 args.output or artifact_paths(config)[1],
+                dataset_name=config.dataset_name,
             )
         elif args.command == "prepare":
-            setup_logging(Path(config.dataset_root) / "manifests" / "logs")
+            setup_logging(paths.manifests / "logs")
             prepare(config, args.source_dir, args.expression_dir, args.data_dir)
         elif args.command in {"train", "train-vae"}:
             setup_logging(args.run_dir)
