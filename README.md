@@ -28,13 +28,18 @@ uv run pytest -q
 ```
 
 The [dataset description](dataset/dataset.md) and
-generated `dataset/manifests/audit_report.json` audit describe the downloaded source files.
+generated `dataset/manifests/AstraZeneca–DREAM/audit_report.json` audit describe the downloaded source files.
 `inspect` records the audit, validated cell mapping, effective configuration and
-runtime in `dataset/manifests/inspection.json`. To rerun the independent source
+runtime in `dataset/manifests/AstraZeneca–DREAM/inspection.json`. To rerun the independent source
 audit, use `uv run python audit_dataset.py`.
 
+Dataset paths use `<dataset_root>/<artifact type>/<dataset_name>/`. All supplied
+configurations select `dataset_root: dataset` and `dataset_name: AstraZeneca–DREAM`
+(with an en dash). See the [directory layout](dataset/dataset.md) for adding
+separate dataset locations and for notes on existing artifacts after migration.
+
 The default pipeline uses the corrected DREAM matrices and CMP RNA-seq. It never
-rewrites `dataset/raw/`. RNA-seq extraction streams the full archive and retains
+rewrites `dataset/raw/AstraZeneca–DREAM/`. RNA-seq extraction streams the full archive and retains
 every model catalogued with Broad or Sanger cell-line RNA-seq (1,643 candidates
 in the current catalog); it does not extract the 6.1 GB CSV to disk. Preparation
 first fixes the final response split, groups related CMP identities, removes all
@@ -53,7 +58,7 @@ The supplied chemistry includes 42 numeric PubChem identifiers requiring exact
 CID resolution. With `sources.resolve_pubchem: true`, the first preparation
 retrieves structures for those released identifiers and preserves the response
 bytes, requested/returned CID, URL and hashes under
-`dataset/processed/drug_features/pubchem/v1/`. Subsequent runs verify and reuse
+`dataset/processed/AstraZeneca–DREAM/drug_features/pubchem/v1/`. Subsequent runs verify and reuse
 that cache offline. Keep it with the experiment. Setting
 `sources.resolve_pubchem: false` uses only locally released parseable SMILES and
 explicitly produces a smaller chemistry-supported cohort. No compound-name
@@ -110,15 +115,15 @@ Every stage has an executable entry point. For explicit artifact paths:
 
 ```bash
 uv run reverse-dose preprocess --config configs/default.yaml \
-  --source-dir dataset/processed/dose_response/manual
+  --source-dir dataset/processed/AstraZeneca–DREAM/dose_response/manual
 uv run reverse-dose extract-expression --config configs/default.yaml
 uv run reverse-dose prepare --config configs/default.yaml \
-  --source-dir dataset/processed/dose_response/manual \
-  --data-dir dataset/splits/manual
+  --source-dir dataset/processed/AstraZeneca–DREAM/dose_response/manual \
+  --data-dir dataset/splits/AstraZeneca–DREAM/manual
 uv run reverse-dose train-vae --config configs/default.yaml \
-  --data-dir dataset/splits/manual --run-dir runs/stages
+  --data-dir dataset/splits/AstraZeneca–DREAM/manual --run-dir runs/stages
 uv run reverse-dose train --config configs/default.yaml \
-  --data-dir dataset/splits/manual --run-dir runs/stages \
+  --data-dir dataset/splits/AstraZeneca–DREAM/manual --run-dir runs/stages \
   --vae-checkpoint runs/stages/vae/best.pt
 ```
 
@@ -131,7 +136,7 @@ For an individual stage, resume with an explicit checkpoint:
 
 ```bash
 uv run reverse-dose train --config configs/default.yaml \
-  --data-dir dataset/splits/manual --run-dir runs/stages \
+  --data-dir dataset/splits/AstraZeneca–DREAM/manual --run-dir runs/stages \
   --vae-checkpoint runs/stages/vae/best.pt \
   --resume runs/stages/model/last.pt
 ```
@@ -229,12 +234,12 @@ from the cell-disjoint cold-start baseline.
 
 | Location                                      | Contents                                                                                              |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `dataset/raw/` | Immutable downloaded sources |
-| `dataset/processed/dose_response/source_*/` | Observations, canonical cell mapping, chemistry features, exclusions and source manifest |
-| `dataset/processed/cell_expression/expression_*/` | Raw TPM means, gene/model IDs, measurement counts and extraction provenance |
-| `dataset/processed/drug_features/pubchem/v1/` | Immutable exact-CID response cache and provenance |
-| `dataset/splits/split_*/` | Split memberships, portable feature arrays, fitted transforms and artifact hashes |
-| `dataset/manifests/logs/` | Standalone preprocessing logs |
+| `dataset/raw/AstraZeneca–DREAM/` | Immutable downloaded sources |
+| `dataset/processed/AstraZeneca–DREAM/dose_response/source_*/` | Observations, canonical cell mapping, chemistry features, exclusions and source manifest |
+| `dataset/processed/AstraZeneca–DREAM/cell_expression/expression_*/` | Raw TPM means, gene/model IDs, measurement counts and extraction provenance |
+| `dataset/processed/AstraZeneca–DREAM/drug_features/pubchem/v1/` | Immutable exact-CID response cache and provenance |
+| `dataset/splits/AstraZeneca–DREAM/split_*/` | Split memberships, portable feature arrays, fitted transforms and artifact hashes |
+| `dataset/manifests/AstraZeneca–DREAM/logs/` | Standalone preprocessing logs |
 | `runs/<run>/` | `run.json`, terminal log, `result.json`, stage directories and evaluations |
 | `runs/<run>/{vae,model}/` | Effective experiment metadata, `events.jsonl`, selected/continuation/periodic checkpoints |
 | `runs/<run>/evaluation/<split>/` | Metrics JSON, per-observation predictions, mixture parameters, per-cell/pair/matrix/inhibition tables |

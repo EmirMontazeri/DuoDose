@@ -33,7 +33,7 @@ uv run reverse-dose preprocess --config configs/oi.yaml
 ```
 
 Standalone preparation writes persistent logs to
-`dataset/manifests/logs/pipeline.log`.
+`dataset/manifests/AstraZeneca–DREAM/logs/pipeline.log`.
 
 ## Exclusions and identifier evidence
 
@@ -108,7 +108,7 @@ ERBB&HDAC_4&CAMA1&Exp1.xlsx
 ERBB&PI3KCD&CAMA1&Exp1.xlsx
 ```
 
-They are under `dataset/raw/az_dream/DREAM_OI_matrices_corrected/`. With
+They are under `dataset/raw/AstraZeneca–DREAM/az_dream/DREAM_OI_matrices_corrected/`. With
 `missing_response_policy: exclude`, preprocessing records all 252 missing point
 coordinates and seven `no_measured_responses` matrix exclusions. It does not
 construct response labels or impute dose-response measurements. With
@@ -125,7 +125,7 @@ equal. Another 42 entries have exact released numeric PubChem identifiers.
 Their responses were retrieved through the PubChem exact-CID property endpoint;
 the requested and returned CIDs, RDKit-valid SMILES, response bytes, retrieval URL
 and SHA256 are preserved under
-`dataset/processed/drug_features/pubchem/v1/<CID>/`. The resolver does not search
+`dataset/processed/AstraZeneca–DREAM/drug_features/pubchem/v1/<CID>/`. The resolver does not search
 names or select similar compounds. The
 [official PUG REST specification](https://pubchem.ncbi.nlm.nih.gov/pcfe/docs/markdown/pug-rest.md)
 documents this exact-CID property interface.

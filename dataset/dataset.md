@@ -1,4 +1,34 @@
-# Dataset
+# Datasets
+
+Dataset storage is grouped first by artifact type, then by dataset name:
+
+```text
+dataset/
+├── dataset.md
+├── raw/
+│   └── AstraZeneca–DREAM/
+│       ├── az_dream/
+│       ├── az_dream_molecular/
+│       └── cell_model_passports/
+├── processed/
+│   └── AstraZeneca–DREAM/
+│       ├── dose_response/
+│       ├── cell_expression/
+│       └── drug_features/
+├── splits/
+│   └── AstraZeneca–DREAM/
+└── manifests/
+    └── AstraZeneca–DREAM/
+```
+
+`dataset_root: dataset` selects the shared storage root. `dataset_name:
+AstraZeneca–DREAM` selects the subdirectory in each artifact type; the name uses
+an en dash (`–`). Additional datasets should use sibling directories under all
+four artifact types and their own configurations. Source readers currently
+support the DREAM/OI release formats; other formats need their own ingestion
+support before training or evaluation.
+
+## AstraZeneca–DREAM
 
 This dataset supports training and evaluation of inverse cancer drug-combination
 dose prediction.
@@ -28,4 +58,15 @@ reason `response_outside_quality_range` and source matrix/grid provenance.
 - **AstraZeneca-Sanger DREAM Challenge:** downloaded from Synapse, project `syn4231880`.
 - **Cell Model Passports:** downloaded from the Wellcome Sanger Institute at `cellmodelpassports.sanger.ac.uk/downloads`.
 
-Files under `raw/` are preserved in their original downloaded form. Derived features, dose-response tables, and dataset splits are stored under `processed/` and `splits/`.
+Files under `raw/AstraZeneca–DREAM/` are preserved in their original downloaded
+form. Derived features and dose-response tables are stored under
+`processed/AstraZeneca–DREAM/`, splits under `splits/AstraZeneca–DREAM/`, and audit,
+inspection and preprocessing logs under `manifests/AstraZeneca–DREAM/`.
+
+Existing artifacts were moved without editing their contents. Older hashed
+manifests can therefore retain the previous source paths; retrospective matrix
+assessment resolves those DREAM paths under the new raw directory and still
+verifies the original file hashes. New preprocessing records the new paths.
+Use newly generated default artifact directories for new experiments: changed
+code and provenance intentionally invalidate reuse of old preprocessing caches
+and checkpoint resumption.

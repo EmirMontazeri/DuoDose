@@ -81,7 +81,7 @@ then fail without changing the experimental cohort. This is explicit external
 identifier resolution, not a claim that all structures were contained directly
 in the downloaded raw files. Reproduction of a recorded online-resolved experiment
 requires its archived cache; future PubChem responses may change. Preserve
-`dataset/processed/drug_features/pubchem/v1/` with the run.
+`dataset/processed/AstraZeneca–DREAM/drug_features/pubchem/v1/` with the run.
 
 `resolve_pubchem: false` defines a separate offline baseline using only parseable
 structures in the supplied local files; numeric-only identifiers are then
