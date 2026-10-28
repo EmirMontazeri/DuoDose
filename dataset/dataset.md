@@ -6,27 +6,37 @@ Dataset storage is grouped first by artifact type, then by dataset name:
 dataset/
 ├── dataset.md
 ├── raw/
-│   └── AstraZeneca–DREAM/
-│       ├── az_dream/
-│       ├── az_dream_molecular/
-│       └── cell_model_passports/
+│   ├── AstraZeneca–DREAM/
+│   │   ├── az_dream/
+│   │   ├── az_dream_molecular/
+│   │   └── cell_model_passports/
+│   ├── NCI-ALMANAC/
+│   └── ONeil-Merck/
 ├── processed/
-│   └── AstraZeneca–DREAM/
-│       ├── dose_response/
-│       ├── cell_expression/
-│       └── drug_features/
+│   ├── AstraZeneca–DREAM/
+│   │   ├── dose_response/
+│   │   ├── cell_expression/
+│   │   └── drug_features/
+│   ├── NCI-ALMANAC/
+│   └── ONeil-Merck/
 ├── splits/
-│   └── AstraZeneca–DREAM/
+│   ├── AstraZeneca–DREAM/
+│   ├── NCI-ALMANAC/
+│   └── ONeil-Merck/
 └── manifests/
-    └── AstraZeneca–DREAM/
+    ├── AstraZeneca–DREAM/
+    ├── NCI-ALMANAC/
+    └── ONeil-Merck/
 ```
 
 `dataset_root: dataset` selects the shared storage root. `dataset_name:
 AstraZeneca–DREAM` selects the subdirectory in each artifact type; the name uses
 an en dash (`–`). Additional datasets should use sibling directories under all
 four artifact types and their own configurations. Source readers currently
-support the DREAM/OI release formats; other formats need their own ingestion
-support before training or evaluation.
+support DREAM/OI, NCI-ALMANAC and O'Neil–Merck release formats. The latter two use
+separate configurations and never pool response measurements with DREAM or each
+other. See [independent workflows](../docs/datasets.md) for official downloads,
+coverage, endpoint definitions, exclusions and cross-dataset evaluation.
 
 ## AstraZeneca–DREAM
 

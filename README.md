@@ -33,10 +33,15 @@ generated `dataset/manifests/AstraZeneca–DREAM/audit_report.json` audit descri
 runtime in `dataset/manifests/AstraZeneca–DREAM/inspection.json`. To rerun the independent source
 audit, use `uv run python audit_dataset.py`.
 
-Dataset paths use `<dataset_root>/<artifact type>/<dataset_name>/`. All supplied
+Dataset paths use `<dataset_root>/<artifact type>/<dataset_name>/`. The DREAM
 configurations select `dataset_root: dataset` and `dataset_name: AstraZeneca–DREAM`
 (with an en dash). See the [directory layout](dataset/dataset.md) for adding
 separate dataset locations and for notes on existing artifacts after migration.
+
+NCI-ALMANAC and O'Neil–Merck have independent configurations, native readers and
+official-file acquisition. See [independent dataset workflows](docs/datasets.md)
+for preparation, separate training and evaluation on another dataset with the
+source model's frozen transforms.
 
 The default pipeline uses the corrected DREAM matrices and CMP RNA-seq. It never
 rewrites `dataset/raw/AstraZeneca–DREAM/`. RNA-seq extraction streams the full archive and retains
@@ -221,9 +226,9 @@ Both commands write separate `cell_results.csv`, `cell_pair_results.csv` and
 `progress.json`. Every evaluation writes an `assessment/` directory with
 primary macro-cell, inhibition-stratified, near-target and worst-group metrics;
 identity-cluster intervals; density/covariance diagnostics; and response-blind
-target choices scored against the original held-out matrices. Raw workbooks are
-required for the target assessment; a portable bundle alone is insufficient to
-reconstruct missing/QC-excluded grid coordinates safely.
+target choices scored against the original held-out matrices. DREAM target
+assessment requires the original raw workbooks. ALMANAC and O'Neil bundles retain
+hash-verified original grid designs, supporting target assessment after export.
 
 These are retrospective robustness analyses, not new independent biological
 replication. OI inclusion is a separate, explicit experiment: copy the configuration and set

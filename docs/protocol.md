@@ -4,6 +4,12 @@ The [architecture](architecture.md) describes the frozen VAE encoder, shared inp
 
 ## Source population, identifiers and observation construction
 
+This section describes the DREAM baseline. Independent NCI-ALMANAC and
+O'Neil–Merck readers, response definitions, source policies and training commands
+are specified in [independent dataset workflows](datasets.md). The same
+split-specific fitting and model architecture apply; response tables are never
+pooled across these datasets.
+
 Corrected DREAM matrices are the default response source. Corrected OI matrices
 can be included explicitly. The original `Raw_Data` matrices and original DREAM
 expression archive remain source/reference data and are not duplicated into the
