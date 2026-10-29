@@ -230,15 +230,11 @@ $$
 The two ordered concatenations are passed through the same linear layer \(W_D\):
 
 $$
-D_1
-=
-W_D(E_A\oplus E_B),
+D_1=W_D(E_A\oplus E_B),
 $$
 
 $$
-D_2
-=
-W_D(E_B\oplus E_A).
+D_2=W_D(E_B\oplus E_A).
 $$
 
 Therefore,
@@ -272,17 +268,13 @@ $$
 ### 4.4 Two-Coordinate Tensor Interaction
 
 $$
-Z_1
-=
-(U_1\odot D_1)
+Z_1=(U_1\odot D_1)
 +
 (U_2\odot D_2),
 $$
 
 $$
-Z_2
-=
-(U_1\odot D_2)
+Z_2=(U_1\odot D_2)
 +
 (U_2\odot D_1).
 $$
@@ -298,8 +290,7 @@ $$
 Flatten for fusion:
 
 $$
-Z_{MF}
-=
+Z_{MF}=
 [Z_1\oplus Z_2]
 \in
 \mathbb R^{B\times2K_{MF}}.
@@ -323,8 +314,7 @@ $$
 Construct
 
 $$
-Cat_A
-=
+Cat_A=
 [E_{\text{cell}}
 \oplus
 E_x
@@ -337,8 +327,7 @@ $$
 and
 
 $$
-Cat_B
-=
+Cat_B=
 [E_{\text{cell}}
 \oplus
 E_x
@@ -363,14 +352,12 @@ $$
 Both representations are passed through exactly the same deep neural network:
 
 $$
-H_A
-=
+H_A=
 DeepMLP(Cat_A),
 $$
 
 $$
-H_B
-=
+H_B=
 DeepMLP(Cat_B).
 $$
 
@@ -391,8 +378,7 @@ $$
 Flatten for fusion:
 
 $$
-H_{\text{deep}}
-=
+H_{\text{deep}}=
 [H_A\oplus H_B]
 \in
 \mathbb R^{B\times K_{MLP}}.
@@ -413,8 +399,7 @@ $$
 Concatenate:
 
 $$
-Fusion\_Vec
-=
+Fusion\_Vec=
 [Z_{MF}\oplus H_{\text{deep}}].
 $$
 
@@ -620,7 +605,7 @@ The paired channels are the coordinates $(Z_1,Z_2)$.
 
                             2D DRUG-DOSE PROBABILITY MAP
 
-                              Coordinate 1 = Dose A
+                              Coordinate 1 Dose A
                               Coordinate 2 = Dose B
 
 ====================================================================================================
